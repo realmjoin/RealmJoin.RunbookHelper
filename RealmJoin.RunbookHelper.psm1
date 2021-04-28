@@ -4,20 +4,8 @@ class RealmJoinUIAttribute : Attribute
 {
     [Entity]$Graph = [Entity]::None;
     [Picker]$Picker = [Picker]::None;
-    [string]$Attribute;
-    [string]$Filter;
-
-    RealmJoinUIAttribute([Entity]$Graph, [string]$Attribute, [string]$Filter)
-    {
-        $this.Graph = $Graph;
-        $this.Attribute = $Attribute;
-        $this.Filter = $Filter;
-    }
-
-    RealmJoinUIAttribute([Picker]$Picker)
-    {
-        $this.Picker = $Picker;
-    }
+    [string]$Attribute = $null;
+    [string]$Filter = $null;
 }
 
 enum Entity
