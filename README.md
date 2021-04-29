@@ -32,3 +32,109 @@ RealmJoin attaches this script to any group. When called in the context of a gro
 By using `Use-RJInterface Graph` a rich selector for `$GuestID` will be shown, populated with data from the Graph, filtered by `userType` in this example.
 
 Finally, since `$ValidUntil` is of type `[DateTime]` a date and a time picker will be shown by default, however `Use-RJInterface` narrows this down to a single date picker with additional `MaxValue` constraint.
+
+# Available options
+```
+NAME
+    Use-RJInterface
+    
+SYNTAX
+    Use-RJInterface [[-Type] {Graph | Number | DateTime | Textarea}] [[-Entity] {User | Group | Device}] [[-Attribute] <string>] [[-Filter] <string>] [[-MinValue] <Object>] [[-MaxValue] <Object>] [-Date] [-Time] 
+    
+    
+PARAMETERS
+    -Attribute <string>
+        
+        Required?                    false
+        Position?                    2
+        Accept pipeline input?       false
+        Parameter set name           (All)
+        Aliases                      None
+        Dynamic?                     false
+        Accept wildcard characters?  false
+        
+    -Date
+        
+        Required?                    false
+        Position?                    Named
+        Accept pipeline input?       false
+        Parameter set name           (All)
+        Aliases                      None
+        Dynamic?                     false
+        Accept wildcard characters?  false
+        
+    -Entity <string>
+        
+        Required?                    false
+        Position?                    1
+        Accept pipeline input?       false
+        Parameter set name           (All)
+        Aliases                      None
+        Dynamic?                     false
+        Accept wildcard characters?  false
+        
+    -Filter <string>
+        
+        Required?                    false
+        Position?                    3
+        Accept pipeline input?       false
+        Parameter set name           (All)
+        Aliases                      None
+        Dynamic?                     false
+        Accept wildcard characters?  false
+        
+    -MaxValue <Object>
+        
+        Required?                    false
+        Position?                    5
+        Accept pipeline input?       false
+        Parameter set name           (All)
+        Aliases                      None
+        Dynamic?                     false
+        Accept wildcard characters?  false
+        
+    -MinValue <Object>
+        
+        Required?                    false
+        Position?                    4
+        Accept pipeline input?       false
+        Parameter set name           (All)
+        Aliases                      None
+        Dynamic?                     false
+        Accept wildcard characters?  false
+        
+    -Time
+        
+        Required?                    false
+        Position?                    Named
+        Accept pipeline input?       false
+        Parameter set name           (All)
+        Aliases                      None
+        Dynamic?                     false
+        Accept wildcard characters?  false
+        
+    -Type <string>
+        
+        Required?                    false
+        Position?                    0
+        Accept pipeline input?       false
+        Parameter set name           (All)
+        Aliases                      None
+        Dynamic?                     false
+        Accept wildcard characters?  false
+        
+    
+INPUTS
+    None
+    
+    
+OUTPUTS
+    System.Object
+    
+ALIASES
+    None
+    
+
+REMARKS
+    None
+```
