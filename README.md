@@ -8,7 +8,7 @@ https://www.powershellgallery.com/packages/RealmJoin.RunbookHelper/
 Consider a runbook "Group: Add guest to group". By using `Use-RJInterface` RealmJoin will show an enhanced UI when running this script.
 
 ```powershell
-using module @{ModuleName = "RealmJoin.RunbookHelper"; ModuleVersion = "0.3.0" }
+#Requires -Module @{ModuleName = "RealmJoin.RunbookHelper"; ModuleVersion = "0.3.0" }
 
 param(
     [Parameter(Mandatory = $true)]
