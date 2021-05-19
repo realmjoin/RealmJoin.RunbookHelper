@@ -1,0 +1,22 @@
+name: Publish using .NET Core
+on:
+  push:
+    tags:
+      - v[0-9]+.[0-9]+.[0-9]+
+
+jobs:
+  build:
+
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Setup .NET Core
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: 3.1.x
+    - name: Push with dotnet nuget
+      env:
+        NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+      run: |
+        pwsh -Command Publish-Module -Name "RealmJoin.RunbookHelper" -NuGetApiKey "$env:NUGET_API_KEY"
