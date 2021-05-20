@@ -15,7 +15,8 @@
 
     # should specify all three of the following to speed up command auto-discovery
     FunctionsToExport = @(
-        'Use-RJInterface',
+        'Use-RJInterface', 'Write-RjRbLog', 'Write-RjRbDebug',
+        'Invoke-RjRbRestMethod', 'Invoke-RjRbRestMethodGraph',
         'Connect-RjRbAzureAD', 'Get-RjRbAzureADTenantDetail', 'Connect-RjRbGraph'
     )
     CmdletsToExport   = @()

@@ -5,25 +5,19 @@ function Connect-RjRbAzureAD {
     )
 
     if ($RjRbRunningInAzure) {
-        Write-Warning "Getting automation connection '$AutomationConnectionName'"
-        $araCon = Get-AutomationConnection -Name $AutomationConnectionName -EA Stop
-
-        Write-Warning "Connecting with AzureAD module"
-        Connect-AzureAD -CertificateThumbprint $araCon.CertificateThumbprint -ApplicationId $araCon.ApplicationId -TenantId $araCon.TenantId -EA Stop | Out-Null
+        Write-RjRbLog "Getting automation connection '$AutomationConnectionName'"
+        $autoCon = Get-AutomationConnection -Name $AutomationConnectionName
     }
     else {
-        $storedCredential = Get-RjRbStoredCredential
-        if ($storedCredential) {
-            Connect-AzureAD -Credential $storedCredential -EA Stop | Out-Null
-        }
-        else {
-            Connect-AzureAD -EA Stop | Out-Null
-        }
+        $autoCon = devGetAutomationConnectionFromLocalCertificate -Name $AutomationConnectionName
     }
+
+    Write-RjRbLog "Connecting with AzureAD module" $autoCon
+    Connect-AzureAD -CertificateThumbprint $autoCon.CertificateThumbprint -ApplicationId $autoCon.ApplicationId -TenantId $autoCon.TenantId -EA Stop | Out-Null
 }
 
 function Get-RjRbAzureADTenantDetail {
-    Write-Warning "Getting Azure AD tenant details"
+    Write-RjRbLog "Getting Azure AD tenant details"
     $aadTenantDetail = Get-AzureADTenantDetail
     return [PSCustomObject]@{
         UpnSuffix   = $aadTenantDetail.VerifiedDomains | Where-Object { $_._Default } | Select-Object -ExpandProperty Name
