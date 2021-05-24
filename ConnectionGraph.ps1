@@ -23,7 +23,7 @@ function Connect-RjRbGraph {
     }
     $tokenResult = authenticateToGraphWithCert @getAuthTokenParams
 
-    $Global:RjRbGraphAuthHeaders = @{
+    $Script:RjRbGraphAuthHeaders = @{
         'Authorization' = "Bearer " + $tokenResult.access_token
     }
 }

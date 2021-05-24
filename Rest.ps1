@@ -8,10 +8,16 @@ function Invoke-RjRbRestMethodGraph {
         [switch] $Beta
     )
 
-    $uri = "https://graph.microsoft.com/$(if($Beta) {"beta"} else {"v1.0"})"
-    $PSBoundParameters.Remove('Beta') | Out-Null
+    $invokeParameters = @{}
+    $PSBoundParameters.Keys | Where-Object { $_ -inotin @('Beta') } | ForEach-Object { $invokeParameters[$_] += $PSBoundParameters[$_] }
 
-    Invoke-RjRbRestMethod -Uri $uri -JsonEncodeBody @PSBoundParameters | Select-Object -ExpandProperty value
+    $invokeParameters['Uri'] = "https://graph.microsoft.com/$(if($Beta) {'beta'} else {'v1.0'})"
+    if (-not $Headers -and $Script:RjRbGraphAuthHeaders) {
+        $invokeParameters['Headers'] = $Script:RjRbGraphAuthHeaders
+    }
+    $invokeParameters['JsonEncodeBody'] = $true
+
+    Invoke-RjRbRestMethod @invokeParameters | Select-Object -ExpandProperty value
 }
 
 function Invoke-RjRbRestMethod {
@@ -21,27 +27,24 @@ function Invoke-RjRbRestMethod {
         [Microsoft.PowerShell.Commands.WebRequestMethod] $Method,
         [Collections.IDictionary] $Headers,
         [object] $Body,
-        [Alias("Resource")][string] $UriSuffix,
+        [Alias('Resource')][string] $UriSuffix,
         [switch] $JsonEncodeBody
     )
 
-    $invokeParameters = $PSBoundParameters
+    $invokeParameters = @{}
+    $PSBoundParameters.Keys | Where-Object { $_ -inotin @('UriSuffix', 'JsonEncodeBody') } | ForEach-Object { $invokeParameters[$_] += $PSBoundParameters[$_] }
+
     if ($Method -eq [Microsoft.PowerShell.Commands.WebRequestMethod]::Default) {
         $invokeParameters['Method'] = $(if ($Body) { [Microsoft.PowerShell.Commands.WebRequestMethod]::Post } else { [Microsoft.PowerShell.Commands.WebRequestMethod]::Get })
     }
     if ($UriSuffix) {
         $invokeParameters['Uri'] = [uri]($Uri.ToString() + $UriSuffix)
-        $invokeParameters.Remove('UriSuffix') | Out-Null
-    }
-    if (-not $Headers -and $Global:RjRbGraphAuthHeaders) {
-        $invokeParameters['Headers'] = $Global:RjRbGraphAuthHeaders
     }
     if ($Body -and $JsonEncodeBody) {
         # need to explicetly set charset in ContenType for Invoke-RestMethod to detect it and to correctly encode JSON string
         $invokeParameters['ContentType'] = "application/json; charset=UTF-8"
         $invokeParameters['Body'] = $Body | ConvertTo-Json
     }
-    $invokeParameters.Remove('JsonEncodeBody') | Out-Null
     $invokeParameters['UseBasicParsing'] = $true
 
     Write-RjRbDebug "Invoke-RestMethod" $invokeParameters
