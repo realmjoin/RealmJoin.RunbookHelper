@@ -16,7 +16,6 @@ and you're good to go and test with exactly the same identity that the runbooks 
 #>
 
 function devGetAutomationConnectionFromLocalCertificate {
-    [CmdletBinding()]
     param (
         [string] $Name = "AzureRunAsConnection"
     )

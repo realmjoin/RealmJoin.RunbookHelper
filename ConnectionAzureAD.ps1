@@ -4,16 +4,11 @@ function Connect-RjRbAzureAD {
         [string] $AutomationConnectionName = "AzureRunAsConnection"
     )
 
-    if ($RjRbRunningInAzure) {
-        Write-RjRbLog "Getting automation connection '$AutomationConnectionName'"
-        $autoCon = Get-AutomationConnection -Name $AutomationConnectionName
-    }
-    else {
-        $autoCon = devGetAutomationConnectionFromLocalCertificate -Name $AutomationConnectionName
-    }
+    $autoCon = getAutomationConnectionOrFromLocalCertificate $AutomationConnectionName
 
     Write-RjRbLog "Connecting with AzureAD module" $autoCon
-    Connect-AzureAD -CertificateThumbprint $autoCon.CertificateThumbprint -ApplicationId $autoCon.ApplicationId -TenantId $autoCon.TenantId -EA Stop | Out-Null
+    Connect-AzureAD -CertificateThumbprint $autoCon.CertificateThumbprint -ApplicationId $autoCon.ApplicationId `
+        -TenantId $autoCon.TenantId | Out-Null
 }
 
 function Get-RjRbAzureADTenantDetail {

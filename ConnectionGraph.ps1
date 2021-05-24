@@ -4,13 +4,7 @@ function Connect-RjRbGraph {
         [string] $AutomationConnectionName = "AzureRunAsConnection"
     )
 
-    if ($RjRbRunningInAzure) {
-        Write-RjRbLog "Getting automation connection '$AutomationConnectionName'"
-        $autoCon = Get-AutomationConnection -Name $AutomationConnectionName
-    }
-    else {
-        $autoCon = devGetAutomationConnectionFromLocalCertificate -Name $AutomationConnectionName
-    }
+    $autoCon = getAutomationConnectionOrFromLocalCertificate $AutomationConnectionName
 
     $certPsPath = "Cert:\CurrentUser\My\$($autoCon.CertificateThumbprint)"
     Write-RjRbLog "Getting certificate (and key) from '$certPsPath'"

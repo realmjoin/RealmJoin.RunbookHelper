@@ -17,7 +17,7 @@
     FunctionsToExport = @(
         'Use-RJInterface', 'Write-RjRbLog', 'Write-RjRbDebug',
         'Invoke-RjRbRestMethod', 'Invoke-RjRbRestMethodGraph',
-        'Connect-RjRbAzureAD', 'Get-RjRbAzureADTenantDetail', 'Connect-RjRbGraph'
+        'Connect-RjRbAzAccount', 'Connect-RjRbAzureAD', 'Get-RjRbAzureADTenantDetail', 'Connect-RjRbExchangeOnline', 'Connect-RjRbGraph'
     )
     CmdletsToExport   = @()
     AliasesToExport   = @()
