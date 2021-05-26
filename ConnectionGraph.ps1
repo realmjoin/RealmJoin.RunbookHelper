@@ -1,8 +1,14 @@
 function Connect-RjRbGraph {
     [CmdletBinding()]
     param (
-        [string] $AutomationConnectionName = "AzureRunAsConnection"
+        [string] $AutomationConnectionName = "AzureRunAsConnection",
+        [switch] $Force
     )
+
+    if (-not $Force -and $Script:RjRbGraphAuthHeaders) {
+        # already have an access token
+        return
+    }
 
     $autoCon = getAutomationConnectionOrFromLocalCertificate $AutomationConnectionName
 
