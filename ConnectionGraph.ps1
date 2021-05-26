@@ -1,16 +1,16 @@
 function Connect-RjRbGraph {
     [CmdletBinding()]
     param (
-        [string] $AutomationConnectionName = "AzureRunAsConnection"
+        [string] $AutomationConnectionName = "AzureRunAsConnection",
+        [switch] $Force
     )
 
-    if ($RjRbRunningInAzure) {
-        Write-RjRbLog "Getting automation connection '$AutomationConnectionName'"
-        $autoCon = Get-AutomationConnection -Name $AutomationConnectionName
+    if (-not $Force -and $Script:RjRbGraphAuthHeaders) {
+        # already have an access token
+        return
     }
-    else {
-        $autoCon = devGetAutomationConnectionFromLocalCertificate -Name $AutomationConnectionName
-    }
+
+    $autoCon = getAutomationConnectionOrFromLocalCertificate $AutomationConnectionName
 
     $certPsPath = "Cert:\CurrentUser\My\$($autoCon.CertificateThumbprint)"
     Write-RjRbLog "Getting certificate (and key) from '$certPsPath'"
@@ -23,7 +23,7 @@ function Connect-RjRbGraph {
     }
     $tokenResult = authenticateToGraphWithCert @getAuthTokenParams
 
-    $Global:RjRbGraphAuthHeaders = @{
+    $Script:RjRbGraphAuthHeaders = @{
         'Authorization' = "Bearer " + $tokenResult.access_token
     }
 }

@@ -1,4 +1,4 @@
-function Use-RJInterface {
+function Use-RjRbInterface {
     param (
         [ValidateSet("Graph", "Number", "DateTime", "Textarea")]
         [string]$Type,
@@ -24,8 +24,10 @@ MinValue  = $MinValue
 MaxValue  = $MaxValue
 "@
 
-        Write-Debug "Use-RJInterface: `r`n$debug"
+        Write-Debug "Use-RjRbInterface: `r`n$debug"
     }
 
     return $true
 }
+
+New-Alias -Name Use-RJInterface -Value Use-RjRbInterface
