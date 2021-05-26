@@ -22,7 +22,6 @@ else {
     . $PSScriptRoot\DevCertificates.ps1
 }
 
-. $PSScriptRoot\RJInterface.ps1
 
 . $PSScriptRoot\Rest.ps1
 . $PSScriptRoot\Connection.ps1
@@ -30,3 +29,4 @@ else {
 . $PSScriptRoot\ConnectionAzureAD.ps1
 . $PSScriptRoot\ConnectionExchangeOnline.ps1
 . $PSScriptRoot\ConnectionGraph.ps1
+. $PSScriptRoot\Interface.ps1
