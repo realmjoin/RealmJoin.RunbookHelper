@@ -14,6 +14,6 @@ function Connect-RjRbExchangeOnline {
     }
 
     Write-RjRbLog "Connecting with ExchangeOnline module" $autoCon
-    Connect-ExchangeOnline -CertificateThumbprint $autoCon.CertificateThumbprint -AppId $autoCon.ApplicationId `
-        -Organization $autoCon.TenantId -ShowBanner:$false
+    Connect-ExchangeOnline -Organization $autoCon.TenantId -AppId $autoCon.ApplicationId `
+        -CertificateThumbprint $autoCon.CertificateThumbprint -ShowBanner:$false
 }

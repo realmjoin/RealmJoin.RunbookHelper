@@ -7,8 +7,8 @@ function Connect-RjRbAzureAD {
     $autoCon = getAutomationConnectionOrFromLocalCertificate $AutomationConnectionName
 
     Write-RjRbLog "Connecting with AzureAD module" $autoCon
-    Connect-AzureAD -CertificateThumbprint $autoCon.CertificateThumbprint -ApplicationId $autoCon.ApplicationId `
-        -TenantId $autoCon.TenantId | Out-Null
+    Connect-AzureAD -TenantId $autoCon.TenantId -ApplicationId $autoCon.ApplicationId `
+        -CertificateThumbprint $autoCon.CertificateThumbprint | Out-Null
 }
 
 function Get-RjRbAzureADTenantDetail {
