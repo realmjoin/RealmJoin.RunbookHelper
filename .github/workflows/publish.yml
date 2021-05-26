@@ -19,4 +19,4 @@ jobs:
       env:
         NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
       run: |
-        pwsh -Command Publish-Module -Name "RealmJoin.RunbookHelper" -NuGetApiKey "$env:NUGET_API_KEY"
+        pwsh -Command Publish-Module -Path . -NuGetApiKey "$env:NUGET_API_KEY"
