@@ -15,7 +15,7 @@ function Invoke-RjRbRestMethodGraph {
     $invokeParameters = rjRbGetParametersFiltered -exclude 'Beta'
 
     $invokeParameters['Uri'] = "https://graph.microsoft.com/$(if($Beta) {'beta'} else {'v1.0'})"
-    if (-not $Headers -and $Script:RjRbGraphAuthHeaders) {
+    if (-not $Headers -and (Test-Path Variable:Script:RjRbGraphAuthHeaders)) {
         $invokeParameters['Headers'] = $Script:RjRbGraphAuthHeaders
     }
     $invokeParameters['JsonEncodeBody'] = $true
