@@ -20,7 +20,11 @@ function Invoke-RjRbRestMethodGraph {
     }
     $invokeParameters['JsonEncodeBody'] = $true
 
-    Invoke-RjRbRestMethod @invokeParameters | Select-Object -ExpandProperty value
+    # We don't always get "value". 
+    $result = Invoke-RjRbRestMethod @invokeParameters
+    if ($result.value) {
+        $result | Select-Object -ExpandProperty value
+    } 
 }
 
 function Invoke-RjRbRestMethod {
