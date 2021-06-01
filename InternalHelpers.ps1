@@ -8,10 +8,10 @@ function rjRbGetParametersFiltered {
     $callStackItem = $(Get-PSCallStack)[$callStackLevel]
 
     $parameterNames = $callStackItem.InvocationInfo.MyCommand.Parameters.Keys
-    if ($include.Length) {
+    if ($null -ne $include -and $include.Length) {
         $parameterNames = $parameterNames | Where-Object { $include -icontains $_ }
     }
-    if ($exclude.Length) {
+    if ($null -ne $exclude -and $exclude.Length) {
         $parameterNames = $parameterNames | Where-Object { $exclude -inotcontains $_ }
     }
 

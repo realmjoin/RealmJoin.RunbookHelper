@@ -5,7 +5,7 @@ function Connect-RjRbGraph {
         [switch] $Force
     )
 
-    if (-not $Force -and $Script:RjRbGraphAuthHeaders) {
+    if (-not $Force -and (Test-Path Variable:Script:RjRbGraphAuthHeaders)) {
         # already have an access token
         return
     }

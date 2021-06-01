@@ -12,6 +12,9 @@ $Global:ErrorActionPreference = "Stop"
 # globally, so we also set this locally since then it will still take effect inside this module's functions
 $ErrorActionPreference = "Stop"
 
+# module scope only
+Set-StrictMode -Version 3
+
 $Global:RjRbRunningInAzure = [bool]$env:AUTOMATION_ASSET_ACCOUNTID
 
 . $PSScriptRoot\Logging.ps1
