@@ -9,10 +9,11 @@ function Invoke-RjRbRestMethodGraph {
         [Microsoft.PowerShell.Commands.WebRequestMethod] $Method = [Microsoft.PowerShell.Commands.WebRequestMethod]::Default,
         [Collections.IDictionary] $Headers,
         [object] $Body,
-        [switch] $Beta
+        [switch] $Beta,
+        [Nullable[bool]] $ReturnValueProperty
     )
 
-    $invokeParameters = rjRbGetParametersFiltered -exclude 'Beta'
+    $invokeParameters = rjRbGetParametersFiltered -exclude 'Beta', 'ReturnValueProperty'
 
     $invokeParameters['Uri'] = "https://graph.microsoft.com/$(if($Beta) {'beta'} else {'v1.0'})"
     if (-not $Headers -and (Test-Path Variable:Script:RjRbGraphAuthHeaders)) {
@@ -20,11 +21,11 @@ function Invoke-RjRbRestMethodGraph {
     }
     $invokeParameters['JsonEncodeBody'] = $true
 
-    # We don't always get "value". 
     $result = Invoke-RjRbRestMethod @invokeParameters
-    if ($result.value) {
-        $result | Select-Object -ExpandProperty value
-    } 
+    if (($ReturnValueProperty -eq $true) -or (($ReturnValueProperty -ne $false) -and $result.PSObject.Properties['value'])) {
+        $result = $result.value
+    }
+    return $result
 }
 
 function Invoke-RjRbRestMethod {
@@ -101,8 +102,8 @@ function Invoke-RjRbRestMethod {
                 $responseReader.Close()
             }
         }
-    Write-RjRbLog "Invoke-RestMethod arguments" $invokeParameters -NoDebugOnly
-    Write-RjRbLog "Invoke-RestMethod error response" $errorResponse
+        Write-RjRbLog "Invoke-RestMethod arguments" $invokeParameters -NoDebugOnly
+        Write-RjRbLog "Invoke-RestMethod error response" $errorResponse
         throw
     }
 
