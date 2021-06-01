@@ -4,6 +4,9 @@ function Connect-RjRbExchangeOnline {
         [string] $AutomationConnectionName = "AzureRunAsConnection"
     )
 
+    # see RealmJoin.RunbookHelper.psm1
+    $Global:VerbosePreference = "SilentlyContinue"
+
     $autoCon = getAutomationConnectionOrFromLocalCertificate $AutomationConnectionName
 
     if ($autoCon.TenantId -inotlike "*.onmicrosoft.com") {

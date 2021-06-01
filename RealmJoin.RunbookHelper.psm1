@@ -1,6 +1,9 @@
 ﻿# $VerbosePreference automatically is set to "Continue" by turning on "Log verbose records"
 # But we only want to use the verbose stream for our own log output and not for verbose output from any other cmdlets
 # that are getting called.
+# Unfortunately setting this here does not always take effect (i.e. it does not seem to work in case our module is being
+# loaded using Import-Module or by some Azure Automation heuristic before the runbook starts, so we also set it again
+# inside the Connect-RjRb* CmdLets to avoid being spammed by e.g. the verbose loading log of the ExchangeOnline module.
 $Global:VerbosePreference = "SilentlyContinue"
 
 # Default should be to terminate on any errors when using our module
