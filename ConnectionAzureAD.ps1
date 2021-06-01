@@ -4,6 +4,9 @@ function Connect-RjRbAzureAD {
         [string] $AutomationConnectionName = "AzureRunAsConnection"
     )
 
+    # see RealmJoin.RunbookHelper.psm1
+    $Global:VerbosePreference = "SilentlyContinue"
+
     $autoCon = getAutomationConnectionOrFromLocalCertificate $AutomationConnectionName
 
     Write-RjRbLog "Connecting with AzureAD module" $autoCon

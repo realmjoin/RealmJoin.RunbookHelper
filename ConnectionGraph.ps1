@@ -10,6 +10,9 @@ function Connect-RjRbGraph {
         return
     }
 
+    # see RealmJoin.RunbookHelper.psm1
+    $Global:VerbosePreference = "SilentlyContinue"
+
     $autoCon = getAutomationConnectionOrFromLocalCertificate $AutomationConnectionName
 
     $certPsPath = "Cert:\CurrentUser\My\$($autoCon.CertificateThumbprint)"
