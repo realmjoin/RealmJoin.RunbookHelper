@@ -10,7 +10,8 @@ function Use-RjRbInterface {
         [switch]$Time,
         [object]$MinValue,
         [object]$MaxValue,
-        [string]$DisplayName
+        [string]$DisplayName,
+        [string]$Description
     )
 
     if ($DebugPreference -ne [System.Management.Automation.ActionPreference]::SilentlyContinue) {
@@ -24,6 +25,7 @@ Time        = $Time
 MinValue    = $MinValue
 MaxValue    = $MaxValue
 DisplayName = $DisplayName
+Description = $Description
 "@
 
         Write-Debug "Use-RjRbInterface: `r`n$debug"
