@@ -22,6 +22,15 @@ function Invoke-RjRbRestMethodGraph {
     $invokeParameters['JsonEncodeBody'] = $true
 
     $result = Invoke-RjRbRestMethod @invokeParameters
+
+    # Handle Paging
+    $newresult = $result
+    while ($newresult.PSObject.Properties.Name -contains "@odata.nextLink") {
+        # actively ignore other parameters
+        $newresult = Invoke-RjRbRestMethod -Uri ($newresult."@odata.nextLink") -Headers $invokeParameters['Headers'] -Method $invokeParameters['Method']
+        $result.value += $newresult.value
+    }
+
     if (($ReturnValueProperty -eq $true) -or (($ReturnValueProperty -ne $false) -and $result.PSObject.Properties['value'])) {
         $result = $result.value
     }
