@@ -1,6 +1,6 @@
 function Use-RjRbInterface {
     param (
-        [ValidateSet("Graph", "Number", "DateTime", "Textarea")]
+        [ValidateSet("Graph", "Number", "DateTime", "Textarea", "Setting")]
         [string]$Type,
         [ValidateSet("User", "Group", "Device")]
         [string]$Entity,
