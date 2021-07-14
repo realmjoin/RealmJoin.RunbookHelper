@@ -89,29 +89,34 @@ function Invoke-RjRbRestMethod {
         $result = Invoke-RestMethod @invokeArguments
     }
     catch {
-        $isNotFound = $_.Exception.Response.StatusCode -eq ([Net.HttpStatusCode]::NotFound)
+        $isWebException = $_.Exception -is [Net.WebException]
+        $isNotFound = $isWebException -and $_.Exception.Response.StatusCode -eq [Net.HttpStatusCode]::NotFound
         $errorAction = $(if ($isNotFound -and $null -ne $NotFoundAction) { $NotFoundAction } else { $ErrorActionPreference })
 
-        # no need to get error response on SilentlyContinue or Ignore
+        # no need to write error details to log on SilentlyContinue or Ignore
         if ($errorAction -notin @([Management.Automation.ActionPreference]::SilentlyContinue, [Management.Automation.ActionPreference]::Ignore)) {
-            # get error response if available
-            $errorResponse = $null; $responseReader = $null
-            try {
-                $responseStream = $_.Exception.Response.GetResponseStream()
-                if ($responseStream) {
-                    $responseReader = [IO.StreamReader]::new($responseStream)
-                    $errorResponse = $responseReader.ReadToEnd()
-                    $errorResponse = $errorResponse | ConvertFrom-Json
-                }
-            }
-            catch { } # ignore all errors
-            finally {
-                if ($responseReader) {
-                    $responseReader.Close()
-                }
-            }
+
             Write-RjRbLog "Invoke-RestMethod arguments" $invokeArguments -NoDebugOnly
-            Write-RjRbLog "Invoke-RestMethod error response" $errorResponse
+
+            # get error response if available
+            if ($isWebException) {
+                $errorResponse = $null; $responseReader = $null
+                try {
+                    $responseStream = $_.Exception.Response.GetResponseStream()
+                    if ($responseStream) {
+                        $responseReader = [IO.StreamReader]::new($responseStream)
+                        $errorResponse = $responseReader.ReadToEnd()
+                        $errorResponse = $errorResponse | ConvertFrom-Json
+                    }
+                }
+                catch { } # ignore all errors
+                finally {
+                    if ($responseReader) {
+                        $responseReader.Close()
+                    }
+                }
+                Write-RjRbLog "Invoke-RestMethod error response" $errorResponse
+            }
         }
 
         Write-Error -ErrorRecord $_ -ErrorAction $errorAction
