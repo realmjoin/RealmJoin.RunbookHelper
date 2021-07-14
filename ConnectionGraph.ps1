@@ -2,32 +2,35 @@ function Connect-RjRbGraph {
     [CmdletBinding()]
     param (
         [string] $AutomationConnectionName = "AzureRunAsConnection",
-        [switch] $Force
+        [switch] $Force,
+        [switch] $ReturnAuthHeaders
     )
 
-    if (-not $Force -and (Test-Path Variable:Script:RjRbGraphAuthHeaders)) {
-        # already have an access token
-        return
+    if ($Force -or -not (Test-Path Variable:Script:RjRbGraphAuthHeaders)) {
+
+        # see RealmJoin.RunbookHelper.psm1
+        $Global:VerbosePreference = "SilentlyContinue"
+
+        $autoCon = getAutomationConnectionOrFromLocalCertificate $AutomationConnectionName
+
+        $certPsPath = "Cert:\CurrentUser\My\$($autoCon.CertificateThumbprint)"
+        Write-RjRbLog "Getting certificate (and key) from '$certPsPath'"
+        $cert = Get-Item $certPsPath
+
+        $getAuthTokenParams = [ordered]@{
+            TenantId    = $autoCon.TenantId
+            AppClientId = $autoCon.ApplicationId
+            CertWithKey = $cert
+        }
+        $tokenResult = authenticateToGraphWithCert @getAuthTokenParams
+
+        $Script:RjRbGraphAuthHeaders = @{
+            'Authorization' = "Bearer " + $tokenResult.access_token
+        }
     }
 
-    # see RealmJoin.RunbookHelper.psm1
-    $Global:VerbosePreference = "SilentlyContinue"
-
-    $autoCon = getAutomationConnectionOrFromLocalCertificate $AutomationConnectionName
-
-    $certPsPath = "Cert:\CurrentUser\My\$($autoCon.CertificateThumbprint)"
-    Write-RjRbLog "Getting certificate (and key) from '$certPsPath'"
-    $cert = Get-Item $certPsPath
-
-    $getAuthTokenParams = [ordered]@{
-        TenantId    = $autoCon.TenantId
-        AppClientId = $autoCon.ApplicationId
-        CertWithKey = $cert
-    }
-    $tokenResult = authenticateToGraphWithCert @getAuthTokenParams
-
-    $Script:RjRbGraphAuthHeaders = @{
-        'Authorization' = "Bearer " + $tokenResult.access_token
+    if ($ReturnAuthHeaders) {
+        return $Script:RjRbGraphAuthHeaders
     }
 }
 
@@ -40,9 +43,9 @@ function authenticateToGraphWithCert([string] $tenantId, [string] $appClientId,
     $jwt = createSignedGraphLogonJwt $oauthUri $appClientId $certWithKey
 
     $invokeRestParams = [ordered]@{
-        Method        = "POST"
-        Uri           = $oauthUri
-        Body          = [ordered]@{ 
+        Method = "POST"
+        Uri    = $oauthUri
+        Body   = [ordered]@{ 
             scope                 = "https://graph.microsoft.com/.default" # needs to be resource for the old AAD endpoint (without /v2.0/)
             client_id             = $appClientId
             client_assertion_type = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"

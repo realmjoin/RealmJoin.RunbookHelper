@@ -4,7 +4,7 @@
 
 @{
     RootModule        = 'RealmJoin.RunbookHelper.psm1'
-    ModuleVersion     = '0.5.2'
+    ModuleVersion     = '0.6.0'
     GUID              = '50c59179-6cb8-4968-bf76-e7de04f02957'
     Author            = 'glueckkanja-gab AG'
     CompanyName       = 'glueckkanja-gab AG'
