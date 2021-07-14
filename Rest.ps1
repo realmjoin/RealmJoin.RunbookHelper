@@ -9,6 +9,8 @@ function Invoke-RjRbRestMethodGraph {
         [Microsoft.PowerShell.Commands.WebRequestMethod] $Method = [Microsoft.PowerShell.Commands.WebRequestMethod]::Default,
         [Collections.IDictionary] $Headers,
         [object] $Body,
+        [string] $InFile,
+        [string] $ContentType,
         [switch] $Beta,
         [Nullable[bool]] $ReturnValueProperty,
         [Management.Automation.ActionPreference] $NotFoundAction
@@ -42,6 +44,8 @@ function Invoke-RjRbRestMethod {
         [Collections.IDictionary] $Headers,
         [object] $Body,
         [switch] $JsonEncodeBody,
+        [string] $InFile,
+        [string] $ContentType,
         [Management.Automation.ActionPreference] $NotFoundAction
     )
 
@@ -69,8 +73,17 @@ function Invoke-RjRbRestMethod {
     }
 
     if ($Method -eq [Microsoft.PowerShell.Commands.WebRequestMethod]::Default) {
-        $invokeArguments['Method'] = $(if ($Body) { [Microsoft.PowerShell.Commands.WebRequestMethod]::Post } else { [Microsoft.PowerShell.Commands.WebRequestMethod]::Get })
+        if ($Body) {
+            $invokeArguments['Method'] = [Microsoft.PowerShell.Commands.WebRequestMethod]::Post
+        }
+        elseif ($InFile) {
+            $invokeArguments['Method'] = [Microsoft.PowerShell.Commands.WebRequestMethod]::Put
+        }
+        else {
+            $invokeArguments['Method'] = [Microsoft.PowerShell.Commands.WebRequestMethod]::Get
+        }
     }
+
     if ($UriSuffix) { $uriBuilder.Path += $UriSuffix }
     if ($UriQueryRaw) { appendToQuery $UriQueryRaw }
     $UriQueryParam | Foreach-Object { appendToQuery $_ -split }
@@ -80,6 +93,14 @@ function Invoke-RjRbRestMethod {
         $invokeArguments['ContentType'] = "application/json; charset=UTF-8"
         $invokeArguments['Body'] = $Body | ConvertTo-Json
     }
+    if ($InFile -and -not $ContentType) {
+        $invokeArguments['ContentType'] = [Web.MimeMapping]::GetMimeMapping($InFile)
+    }
+
+    # remove empty string parameters since they will never be $null but empty only
+    @('InFile', 'ContentType') | Where-Object { $invokeArguments.ContainsKey($_) -and $invokeArguments[$_] -eq [string]::Empty } | `
+        ForEach-Object { $invokeArguments.Remove($_) }
+
     $invokeArguments['Uri'] = $uriBuilder.Uri
     $invokeArguments['UseBasicParsing'] = $true
 
