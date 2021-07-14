@@ -2,7 +2,8 @@ function rjRbGetParametersFiltered {
     param (
         [string[]] $include,
         [string[]] $exclude,
-        [int] $callStackLevel = 1
+        [int] $callStackLevel = 1,
+        [hashtable] $sourceValues
     )
 
     $callStackItem = $(Get-PSCallStack)[$callStackLevel]
@@ -16,7 +17,8 @@ function rjRbGetParametersFiltered {
     }
 
     $paramsAndValues = @{}
-    Get-Variable -Scope $callStackLevel | Where-Object { $parameterNames -icontains $_.Name -and $null -ne $_.Value } | ForEach-Object { $paramsAndValues[$_.Name] = $_.Value }
+    $(if ($null -eq $sourceValues) { Get-Variable -Scope $callStackLevel } else { $sourceValues.GetEnumerator() }) | `
+        Where-Object { $parameterNames -icontains $_.Name -and $null -ne $_.Value } | ForEach-Object { $paramsAndValues[$_.Name] = $_.Value }
 
     return $paramsAndValues
 }

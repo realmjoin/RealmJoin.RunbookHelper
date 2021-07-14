@@ -6,6 +6,7 @@ function Invoke-RjRbRestMethodGraph {
         [string] $UriQueryRaw,
         [string] $OdFilter,
         [string] $OdSelect,
+        [int] $OdTop,
         [Microsoft.PowerShell.Commands.WebRequestMethod] $Method = [Microsoft.PowerShell.Commands.WebRequestMethod]::Default,
         [Collections.IDictionary] $Headers,
         [object] $Body,
@@ -13,10 +14,11 @@ function Invoke-RjRbRestMethodGraph {
         [string] $ContentType,
         [switch] $Beta,
         [Nullable[bool]] $ReturnValueProperty,
+        [switch] $FollowPaging,
         [Management.Automation.ActionPreference] $NotFoundAction
     )
 
-    $invokeArguments = rjRbGetParametersFiltered -exclude 'Beta', 'ReturnValueProperty'
+    $invokeArguments = rjRbGetParametersFiltered -exclude 'Beta', 'ReturnValueProperty', 'FollowPaging'
 
     $invokeArguments['Uri'] = "https://graph.microsoft.com/$(if($Beta) {'beta'} else {'v1.0'})"
     if (-not $Headers -and (Test-Path Variable:Script:RjRbGraphAuthHeaders)) {
@@ -27,18 +29,25 @@ function Invoke-RjRbRestMethodGraph {
     }
 
     $result = Invoke-RjRbRestMethod @invokeArguments
+    if ($null -ne $result) {
 
-    # Handle Paging
-    $newresult = $result
-    while ($newresult.PSObject.Properties.Name -contains "@odata.nextLink") {
-        # actively ignore other parameters
-        $newresult = Invoke-RjRbRestMethod -Uri ($newresult."@odata.nextLink") -Headers $invokeParameters['Headers'] -Method $invokeParameters['Method']
-        $result.value += $newresult.value
+        if ($FollowPaging -and $result.PSObject.Properties['value']) {
+            # successively release results to PS pipeline
+            Write-Output $result.value
+            $invokeNextLinkArguments = rjRbGetParametersFiltered -sourceValues $invokeArguments -include 'Method', 'Headers'
+            while ($result.PSObject.Properties['@odata.nextLink'] -and $result.PSObject.Properties['value']) {
+                $invokeNextLinkArguments['Uri'] = $result.'@odata.nextLink'
+                $result = Invoke-RjRbRestMethod @invokeNextLinkArguments
+                Write-Output $result.value
+            }
+            return # result has already been return using Write-Output
+        }
+
+        if (($ReturnValueProperty -eq $true) -or (($ReturnValueProperty -ne $false) -and $result.PSObject.Properties['value'])) {
+            $result = $result.value
+        }
     }
 
-    if (($ReturnValueProperty -eq $true) -or (($ReturnValueProperty -ne $false) -and $null -ne $result -and $result.PSObject.Properties['value'])) {
-        $result = $result.value
-    }
     return $result
 }
 
@@ -52,6 +61,7 @@ function Invoke-RjRbRestMethod {
         [string] $UriQueryRaw,
         [string] $OdFilter,
         [string] $OdSelect,
+        [int] $OdTop,
         [Collections.IDictionary] $Headers,
         [object] $Body,
         [switch] $JsonEncodeBody,
@@ -60,7 +70,7 @@ function Invoke-RjRbRestMethod {
         [Management.Automation.ActionPreference] $NotFoundAction
     )
 
-    $invokeArguments = rjRbGetParametersFiltered -exclude 'UriSuffix', 'UriQueryParam', 'UriQueryRaw', 'OdFilter', 'OdSelect', 'JsonEncodeBody', 'NotFoundAction'
+    $invokeArguments = rjRbGetParametersFiltered -exclude 'UriSuffix', 'UriQueryParam', 'UriQueryRaw', 'OdFilter', 'OdSelect', 'OdTop', 'JsonEncodeBody', 'NotFoundAction'
 
     $uriBuilder = [UriBuilder]::new($Uri)
     function appendToQuery([string] $newQueryOrParamName, [object] $paramValue <# [string] would never be $null #>, [switch] $split, [switch] $skipEmpty) {
