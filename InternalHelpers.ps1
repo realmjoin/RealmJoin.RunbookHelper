@@ -16,7 +16,7 @@ function rjRbGetParametersFiltered {
     }
 
     $paramsAndValues = @{}
-    Get-Variable -Scope $callStackLevel | Where-Object { $parameterNames -icontains $_.Name } | ForEach-Object { $paramsAndValues[$_.Name] = $_.Value }
+    Get-Variable -Scope $callStackLevel | Where-Object { $parameterNames -icontains $_.Name -and $null -ne $_.Value } | ForEach-Object { $paramsAndValues[$_.Name] = $_.Value }
 
     return $paramsAndValues
 }
