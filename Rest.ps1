@@ -22,7 +22,9 @@ function Invoke-RjRbRestMethodGraph {
     if (-not $Headers -and (Test-Path Variable:Script:RjRbGraphAuthHeaders)) {
         $invokeArguments['Headers'] = $Script:RjRbGraphAuthHeaders
     }
-    $invokeArguments['JsonEncodeBody'] = $true
+    if (-not ($Body -is [byte[]] -or $Body -is [IO.Stream])) {
+        $invokeArguments['JsonEncodeBody'] = $true
+    }
 
     $result = Invoke-RjRbRestMethod @invokeArguments
     if (($ReturnValueProperty -eq $true) -or (($ReturnValueProperty -ne $false) -and $null -ne $result -and $result.PSObject.Properties['value'])) {
