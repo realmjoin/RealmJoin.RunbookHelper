@@ -51,6 +51,58 @@ function Invoke-RjRbRestMethodGraph {
     return $result
 }
 
+function Invoke-RjRbRestMethodDefenderATP {
+    [CmdletBinding()]
+    param (
+        [string] $Resource,
+        [string[]] $UriQueryParam = @(),
+        [string] $UriQueryRaw,
+        [string] $OdFilter,
+        [string] $OdSelect,
+        [int] $OdTop,
+        [Microsoft.PowerShell.Commands.WebRequestMethod] $Method = [Microsoft.PowerShell.Commands.WebRequestMethod]::Default,
+        [Collections.IDictionary] $Headers,
+        [object] $Body,
+        [string] $InFile,
+        [string] $ContentType,
+        [Nullable[bool]] $ReturnValueProperty,
+        [switch] $FollowPaging,
+        [Management.Automation.ActionPreference] $NotFoundAction
+    )
+
+    $invokeArguments = rjRbGetParametersFiltered -exclude 'ReturnValueProperty', 'FollowPaging'
+
+    $invokeArguments['Uri'] = "https://api.securitycenter.microsoft.com/api/"
+    if (-not $Headers -and (Test-Path Variable:Script:RjRbDefenderATPAuthHeaders)) {
+        $invokeArguments['Headers'] = $Script:RjRbDefenderATPAuthHeaders
+    }
+    if (-not ($Body -is [byte[]] -or $Body -is [IO.Stream])) {
+        $invokeArguments['JsonEncodeBody'] = $true
+    }
+
+    $result = Invoke-RjRbRestMethod @invokeArguments
+    if ($null -ne $result) {
+
+        if ($FollowPaging -and $result.PSObject.Properties['value']) {
+            # successively release results to PS pipeline
+            Write-Output $result.value
+            $invokeNextLinkArguments = rjRbGetParametersFiltered -sourceValues $invokeArguments -include 'Method', 'Headers'
+            while ($result.PSObject.Properties['@odata.nextLink'] -and $result.PSObject.Properties['value']) {
+                $invokeNextLinkArguments['Uri'] = $result.'@odata.nextLink'
+                $result = Invoke-RjRbRestMethod @invokeNextLinkArguments
+                Write-Output $result.value
+            }
+            return # result has already been return using Write-Output
+        }
+
+        if (($ReturnValueProperty -eq $true) -or (($ReturnValueProperty -ne $false) -and $result.PSObject.Properties['value'])) {
+            $result = $result.value
+        }
+    }
+
+    return $result
+}
+
 function Invoke-RjRbRestMethod {
     [CmdletBinding()]
     param (
