@@ -121,6 +121,8 @@ function Invoke-RjRbRestMethod {
         [string] $ContentType,
         [Management.Automation.ActionPreference] $NotFoundAction
     )
+    # for handling http 429 (throttling)
+    [int]$maxRetries = 3
 
     $invokeArguments = rjRbGetParametersFiltered -exclude 'UriSuffix', 'UriQueryParam', 'UriQueryRaw', 'OdFilter', 'OdSelect', 'OdTop', 'JsonEncodeBody', 'NotFoundAction'
 
@@ -179,41 +181,69 @@ function Invoke-RjRbRestMethod {
 
     Write-RjRbDebug "Invoke-RestMethod arguments" $invokeArguments
     $result = $null # Write-Error down below might not be terminating
-    try {
-        $result = Invoke-RestMethod @invokeArguments
-    }
-    catch {
-        $isWebException = $_.Exception -is [Net.WebException]
-        $isNotFound = $isWebException -and $_.Exception.Response.StatusCode -eq [Net.HttpStatusCode]::NotFound
-        $errorAction = $(if ($isNotFound -and $null -ne $NotFoundAction) { $NotFoundAction } else { $ErrorActionPreference })
-
-        # no need to write error details to log on SilentlyContinue or Ignore
-        if ($errorAction -notin @([Management.Automation.ActionPreference]::SilentlyContinue, [Management.Automation.ActionPreference]::Ignore)) {
-
-            Write-RjRbLog "Invoke-RestMethod arguments" $invokeArguments -NoDebugOnly
-
-            # get error response if available
-            if ($isWebException) {
-                $errorResponse = $null; $responseReader = $null
-                try {
-                    $responseStream = $_.Exception.Response.GetResponseStream()
-                    if ($responseStream) {
-                        $responseReader = [IO.StreamReader]::new($responseStream)
-                        $errorResponse = $responseReader.ReadToEnd()
-                        $errorResponse = $errorResponse | ConvertFrom-Json
-                    }
-                }
-                catch { } # ignore all errors
-                finally {
-                    if ($responseReader) {
-                        $responseReader.Close()
-                    }
-                }
-                Write-RjRbLog "Invoke-RestMethod error response" $errorResponse
-            }
+    
+    [int]$tries = 0
+    while ($tries -le $maxRetries) {
+        try {
+            $tries++ 
+            $result = Invoke-RestMethod @invokeArguments
         }
+        catch {
+            $isWebException = ($_.Exception -is [Net.WebException]) -or ($_.Exception -is [Microsoft.PowerShell.Commands.HttpResponseException])
 
-        Write-Error -ErrorRecord $_ -ErrorAction $errorAction
+            ## PS5 does not know of "[Net.HttpStatusCode]::TooManyRequests", using static code instead.
+            $isThrottled = $isWebException -and $_.Exception.Response.StatusCode -eq "429"
+            $isNotFound = $isWebException -and $_.Exception.Response.StatusCode -eq [Net.HttpStatusCode]::NotFound
+
+            if ($isThrottled -and ($tries -le $maxRetries)) {
+                [double]$waittime = 0
+                if ($_.Exception.Response.Headers -contains "Retry-After") {
+                    $waittime = $_.Exception.Response.Headers["Retry-After"]
+                }
+                else {
+                    $waittime = 15
+                }
+                
+                Write-RjRbLog "Throttled by http code 429. Waiting $waittime seconds"
+                Start-Sleep -Seconds $waittime
+                Write-RjRbDebug "Retry no. $tries"
+            }
+            else {
+                # do not retry
+                $tries = $maxRetries
+
+                # Handle 404 / not found
+                $errorAction = $(if ($isNotFound -and $null -ne $NotFoundAction) { $NotFoundAction } else { $ErrorActionPreference })
+
+                # no need to write error details to log on SilentlyContinue or Ignore
+                if ($errorAction -notin @([Management.Automation.ActionPreference]::SilentlyContinue, [Management.Automation.ActionPreference]::Ignore)) {
+
+                    Write-RjRbLog "Invoke-RestMethod arguments" $invokeArguments -NoDebugOnly
+
+                    # get error response if available
+                    if ($isWebException) {
+                        $errorResponse = $null; $responseReader = $null
+                        try {
+                            $responseStream = $_.Exception.Response.GetResponseStream()
+                            if ($responseStream) {
+                                $responseReader = [IO.StreamReader]::new($responseStream)
+                                $errorResponse = $responseReader.ReadToEnd()
+                                $errorResponse = $errorResponse | ConvertFrom-Json
+                            }
+                        }
+                        catch { } # ignore all errors
+                        finally {
+                            if ($responseReader) {
+                                $responseReader.Close()
+                            }
+                        }
+                        Write-RjRbLog "Invoke-RestMethod error response" $errorResponse
+                    }
+                }
+
+                Write-Error -ErrorRecord $_ -ErrorAction $errorAction
+            }
+        } 
     }
 
     Write-RjRbDebug "Invoke-RestMethod result" $result
