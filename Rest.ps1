@@ -18,7 +18,7 @@ function Invoke-RjRbRestMethodGraph {
         [Management.Automation.ActionPreference] $NotFoundAction
     )
 
-    $invokeArguments = rjRbGetParametersFiltered -exclude 'Beta', 'ReturnValueProperty', 'FollowPaging'
+    $invokeArguments = rjRbGetParametersFiltered -exclude 'Beta'
 
     $invokeArguments['Uri'] = "https://graph.microsoft.com/$(if($Beta) {'beta'} else {'v1.0'})"
     if (-not $Headers -and (Test-Path Variable:Script:RjRbGraphAuthHeaders)) {
@@ -28,27 +28,7 @@ function Invoke-RjRbRestMethodGraph {
         $invokeArguments['JsonEncodeBody'] = $true
     }
 
-    $result = Invoke-RjRbRestMethod @invokeArguments
-    if ($null -ne $result) {
-
-        if ($FollowPaging -and $result.PSObject.Properties['value']) {
-            # successively release results to PS pipeline
-            Write-Output $result.value
-            $invokeNextLinkArguments = rjRbGetParametersFiltered -sourceValues $invokeArguments -include 'Method', 'Headers'
-            while ($result.PSObject.Properties['@odata.nextLink'] -and $result.PSObject.Properties['value']) {
-                $invokeNextLinkArguments['Uri'] = $result.'@odata.nextLink'
-                $result = Invoke-RjRbRestMethod @invokeNextLinkArguments
-                Write-Output $result.value
-            }
-            return # result has already been return using Write-Output
-        }
-
-        if (($ReturnValueProperty -eq $true) -or (($ReturnValueProperty -ne $false) -and $result.PSObject.Properties['value'])) {
-            $result = $result.value
-        }
-    }
-
-    return $result
+    Invoke-RjRbRestMethod @invokeArguments
 }
 
 function Invoke-RjRbRestMethod {
@@ -67,10 +47,12 @@ function Invoke-RjRbRestMethod {
         [switch] $JsonEncodeBody,
         [string] $InFile,
         [string] $ContentType,
-        [Management.Automation.ActionPreference] $NotFoundAction
+        [Management.Automation.ActionPreference] $NotFoundAction,
+        [switch] $FollowPaging,
+        [Nullable[bool]] $ReturnValueProperty
     )
 
-    $invokeArguments = rjRbGetParametersFiltered -exclude 'UriSuffix', 'UriQueryParam', 'UriQueryRaw', 'OdFilter', 'OdSelect', 'OdTop', 'JsonEncodeBody', 'NotFoundAction'
+    $invokeArguments = rjRbGetParametersFiltered -exclude 'UriSuffix', 'UriQueryParam', 'UriQueryRaw', 'OdFilter', 'OdSelect', 'OdTop', 'FollowPaging', 'ReturnValueProperty'
 
     $uriBuilder = [UriBuilder]::new($Uri)
     function appendToQuery([string] $newQueryOrParamName, [object] $paramValue <# [string] would never be $null #>, [switch] $split, [switch] $skipEmpty) {
@@ -93,6 +75,54 @@ function Invoke-RjRbRestMethod {
         }
     }
 
+    if ($UriSuffix) { $uriBuilder.Path += $UriSuffix }
+    if ($UriQueryRaw) { appendToQuery $UriQueryRaw }
+    $UriQueryParam | Foreach-Object { appendToQuery $_ -split }
+    $PSBoundParameters.Keys -ilike 'Od*' | Foreach-Object { appendToQuery "`$$($_.Substring(2).ToLower())" $PSBoundParameters[$_] -skipEmpty }
+
+    $invokeArguments['Uri'] = $uriBuilder.Uri
+
+    $result = Invoke-RjRbRestMethodImpl @invokeArguments
+
+    if ($null -ne $result) {
+
+        if ($FollowPaging -and $result.PSObject.Properties['value']) {
+            # successively release results to PS pipeline
+            Write-Output $result.value
+            $invokeNextLinkArguments = rjRbGetParametersFiltered -sourceValues $invokeArguments -include 'Method', 'Headers'
+            while ($result.PSObject.Properties['@odata.nextLink'] -and $result.PSObject.Properties['value']) {
+                $invokeNextLinkArguments['Uri'] = $result.'@odata.nextLink'
+                $result = Invoke-RjRbRestMethodImpl @invokeNextLinkArguments
+                Write-Output $result.value
+            }
+            return # result has already been return using Write-Output
+        }
+
+        if (($ReturnValueProperty -eq $true) -or (($ReturnValueProperty -ne $false) -and $result.PSObject.Properties['value'])) {
+            $result = $result.value
+        }
+
+    }
+
+    return $result
+}
+
+function Invoke-RjRbRestMethodImpl {
+    [CmdletBinding()]
+    param (
+        [Microsoft.PowerShell.Commands.WebRequestMethod] $Method = [Microsoft.PowerShell.Commands.WebRequestMethod]::Default,
+        [uri] $Uri,
+        [Collections.IDictionary] $Headers,
+        [object] $Body,
+        [switch] $JsonEncodeBody,
+        [string] $InFile,
+        [string] $ContentType,
+        [int] $ThrottleMaxTries = 3,
+        [Management.Automation.ActionPreference] $NotFoundAction
+    )
+
+    $invokeArguments = rjRbGetParametersFiltered -exclude 'JsonEncodeBody', 'ThrottleMaxTries', 'NotFoundAction'
+
     if ($Method -eq [Microsoft.PowerShell.Commands.WebRequestMethod]::Default) {
         if ($Body) {
             $invokeArguments['Method'] = [Microsoft.PowerShell.Commands.WebRequestMethod]::Post
@@ -105,12 +135,8 @@ function Invoke-RjRbRestMethod {
         }
     }
 
-    if ($UriSuffix) { $uriBuilder.Path += $UriSuffix }
-    if ($UriQueryRaw) { appendToQuery $UriQueryRaw }
-    $UriQueryParam | Foreach-Object { appendToQuery $_ -split }
-    $PSBoundParameters.Keys -ilike 'Od*' | Foreach-Object { appendToQuery "`$$($_.Substring(2).ToLower())" $PSBoundParameters[$_] -skipEmpty }
     if ($Body -and $JsonEncodeBody) {
-        # need to explicetly set charset in ContenType for Invoke-RestMethod to detect it and to correctly encode JSON string
+        # need to explicetly set charset in ContentType for Invoke-RestMethod to detect it and to correctly encode JSON string
         $invokeArguments['ContentType'] = "application/json; charset=UTF-8"
         $invokeArguments['Body'] = $Body | ConvertTo-Json
     }
@@ -122,47 +148,68 @@ function Invoke-RjRbRestMethod {
     @('InFile', 'ContentType') | Where-Object { $invokeArguments.ContainsKey($_) -and $invokeArguments[$_] -eq [string]::Empty } | `
         ForEach-Object { $invokeArguments.Remove($_) }
 
-    $invokeArguments['Uri'] = $uriBuilder.Uri
     $invokeArguments['UseBasicParsing'] = $true
 
     Write-RjRbDebug "Invoke-RestMethod arguments" $invokeArguments
-    $result = $null # Write-Error down below might not be terminating
-    try {
-        $result = Invoke-RestMethod @invokeArguments
-    }
-    catch {
-        $isWebException = $_.Exception -is [Net.WebException]
-        $isNotFound = $isWebException -and $_.Exception.Response.StatusCode -eq [Net.HttpStatusCode]::NotFound
-        $errorAction = $(if ($isNotFound -and $null -ne $NotFoundAction) { $NotFoundAction } else { $ErrorActionPreference })
 
-        # no need to write error details to log on SilentlyContinue or Ignore
-        if ($errorAction -notin @([Management.Automation.ActionPreference]::SilentlyContinue, [Management.Automation.ActionPreference]::Ignore)) {
+    $tryCount = 0
+    do {
 
-            Write-RjRbLog "Invoke-RestMethod arguments" $invokeArguments -NoDebugOnly
-
-            # get error response if available
-            if ($isWebException) {
-                $errorResponse = $null; $responseReader = $null
-                try {
-                    $responseStream = $_.Exception.Response.GetResponseStream()
-                    if ($responseStream) {
-                        $responseReader = [IO.StreamReader]::new($responseStream)
-                        $errorResponse = $responseReader.ReadToEnd()
-                        $errorResponse = $errorResponse | ConvertFrom-Json
-                    }
-                }
-                catch { } # ignore all errors
-                finally {
-                    if ($responseReader) {
-                        $responseReader.Close()
-                    }
-                }
-                Write-RjRbLog "Invoke-RestMethod error response" $errorResponse
-            }
+        $tryCount++
+        $result = $null # Write-Error down below might not be terminating
+        try {
+            $result = Invoke-RestMethod @invokeArguments
         }
 
-        Write-Error -ErrorRecord $_ -ErrorAction $errorAction
-    }
+        catch {
+            $isWebException = $_.Exception -is [Net.WebException]
+
+            $isThrottled = $isWebException -and $_.Exception.Response.StatusCode -eq 429 # .NET 4.7 does not (yet) contain [Net.HttpStatusCode]::TooManyRequests
+            if ($isThrottled -and $tryCount -lt $ThrottleMaxTries) {
+                $retryAfter = [double]$_.Exception.Response.Headers["Retry-After"]
+                if (-not $retryAfter) { $retryAfter = 15 }
+
+                Write-RjRbLog "Request has been throttled (http status 429). Delaying for $retryAfter seconds and then trying again (this was try $tryCount of $ThrottleMaxTries)."
+                Start-Sleep -Seconds $retryAfter
+
+                continue # retry
+            }
+
+            $isNotFound = $isWebException -and $_.Exception.Response.StatusCode -eq [Net.HttpStatusCode]::NotFound
+            $errorAction = $(if ($isNotFound -and $null -ne $NotFoundAction) { $NotFoundAction } else { $ErrorActionPreference })
+
+            # no need to write error details to log on SilentlyContinue or Ignore
+            if ($errorAction -notin @([Management.Automation.ActionPreference]::SilentlyContinue, [Management.Automation.ActionPreference]::Ignore)) {
+
+                Write-RjRbLog "Invoke-RestMethod arguments" $invokeArguments -NoDebugOnly
+
+                # get error response if available
+                if ($isWebException) {
+                    $errorResponse = $null; $responseReader = $null
+                    try {
+                        $responseStream = $_.Exception.Response.GetResponseStream()
+                        if ($responseStream) {
+                            $responseReader = [IO.StreamReader]::new($responseStream)
+                            $errorResponse = $responseReader.ReadToEnd()
+                            $errorResponse = $errorResponse | ConvertFrom-Json
+                        }
+                    }
+                    catch { } # ignore all errors
+                    finally {
+                        if ($responseReader) {
+                            $responseReader.Close()
+                        }
+                    }
+                    Write-RjRbLog "Invoke-RestMethod error response" $errorResponse
+                }
+            }
+
+            Write-Error -ErrorRecord $_ -ErrorAction $errorAction
+        }
+
+        break # always break since retries due to throttling will have already been handled above
+
+    } while ($true) # need this for 'continue' to work
 
     Write-RjRbDebug "Invoke-RestMethod result" $result
 
