@@ -32,7 +32,7 @@ else {
 . $PSScriptRoot\ConnectionAz.ps1
 . $PSScriptRoot\ConnectionAzureAD.ps1
 . $PSScriptRoot\ConnectionExchangeOnline.ps1
-. $PSScriptRoot\ConnectionGraph.ps1
+. $PSScriptRoot\ConnectionOAuth2.ps1
 . $PSScriptRoot\Interface.ps1
 . $PSScriptRoot\InternalHelpers.ps1
 . $PSScriptRoot\Rest.ps1
