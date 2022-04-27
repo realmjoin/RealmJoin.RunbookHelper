@@ -21,14 +21,42 @@ function Invoke-RjRbRestMethodGraph {
     $invokeArguments = rjRbGetParametersFiltered -exclude 'Beta'
 
     $invokeArguments['Uri'] = "https://graph.microsoft.com/$(if($Beta) {'beta'} else {'v1.0'})"
+
     if (-not $Headers -and (Test-Path Variable:Script:RjRbGraphAuthHeaders)) {
         $invokeArguments['Headers'] = $Script:RjRbGraphAuthHeaders
     }
-    if (-not ($Body -is [byte[]] -or $Body -is [IO.Stream])) {
-        $invokeArguments['JsonEncodeBody'] = $true
+
+    Invoke-RjRbRestMethod -JsonEncodeBody @invokeArguments
+}
+
+function Invoke-RjRbRestMethodDefenderATP {
+    [CmdletBinding()]
+    param (
+        [string] $Resource,
+        [string[]] $UriQueryParam = @(),
+        [string] $UriQueryRaw,
+        [string] $OdFilter,
+        [string] $OdSelect,
+        [int] $OdTop,
+        [Microsoft.PowerShell.Commands.WebRequestMethod] $Method = [Microsoft.PowerShell.Commands.WebRequestMethod]::Default,
+        [Collections.IDictionary] $Headers,
+        [object] $Body,
+        [string] $InFile,
+        [string] $ContentType,
+        [Nullable[bool]] $ReturnValueProperty,
+        [switch] $FollowPaging,
+        [Management.Automation.ActionPreference] $NotFoundAction
+    )
+
+    $invokeArguments = rjRbGetParametersFiltered
+
+    $invokeArguments['Uri'] = "https://api.securitycenter.microsoft.com/api"
+
+    if (-not $Headers -and (Test-Path Variable:Script:RjRbDefenderATPAuthHeaders)) {
+        $invokeArguments['Headers'] = $Script:RjRbDefenderATPAuthHeaders
     }
 
-    Invoke-RjRbRestMethod @invokeArguments
+    Invoke-RjRbRestMethod -JsonEncodeBody @invokeArguments
 }
 
 function Invoke-RjRbRestMethod {
@@ -82,7 +110,7 @@ function Invoke-RjRbRestMethod {
 
     $invokeArguments['Uri'] = $uriBuilder.Uri
 
-    $result = Invoke-RjRbRestMethodImpl @invokeArguments
+    $result = invokeRjRbRestMethodInternal @invokeArguments
 
     if ($null -ne $result) {
 
@@ -92,7 +120,7 @@ function Invoke-RjRbRestMethod {
             $invokeNextLinkArguments = rjRbGetParametersFiltered -sourceValues $invokeArguments -include 'Method', 'Headers'
             while ($result.PSObject.Properties['@odata.nextLink'] -and $result.PSObject.Properties['value']) {
                 $invokeNextLinkArguments['Uri'] = $result.'@odata.nextLink'
-                $result = Invoke-RjRbRestMethodImpl @invokeNextLinkArguments
+                $result = invokeRjRbRestMethodInternal @invokeNextLinkArguments
                 Write-Output $result.value
             }
             return # result has already been return using Write-Output
@@ -107,7 +135,7 @@ function Invoke-RjRbRestMethod {
     return $result
 }
 
-function Invoke-RjRbRestMethodImpl {
+function invokeRjRbRestMethodInternal {
     [CmdletBinding()]
     param (
         [Microsoft.PowerShell.Commands.WebRequestMethod] $Method = [Microsoft.PowerShell.Commands.WebRequestMethod]::Default,
@@ -135,7 +163,7 @@ function Invoke-RjRbRestMethodImpl {
         }
     }
 
-    if ($Body -and $JsonEncodeBody) {
+    if ($JsonEncodeBody -and $Body -and (-not ($Body -is [byte[]] -or $Body -is [IO.Stream]))) {
         # need to explicetly set charset in ContentType for Invoke-RestMethod to detect it and to correctly encode JSON string
         $invokeArguments['ContentType'] = "application/json; charset=UTF-8"
         $invokeArguments['Body'] = $Body | ConvertTo-Json
