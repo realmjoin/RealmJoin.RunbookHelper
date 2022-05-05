@@ -6,7 +6,7 @@ function Connect-RjRbGraph {
         [switch] $ReturnAuthHeaders
     )
 
-    connectOAuth2Impl "RjRbGraphAuthHeaders" "https://graph.microsoft.com/.default" @PSBoundParameters
+    connectOAuth2Impl "RjRbGraphAuthHeaders" "https://graph.microsoft.com" @PSBoundParameters
 }
 
 function Connect-RjRbDefenderATP {
@@ -17,7 +17,7 @@ function Connect-RjRbDefenderATP {
         [switch] $ReturnAuthHeaders
     )
 
-    connectOAuth2Impl "RjRbDefenderATPAuthHeaders" "https://securitycenter.onmicrosoft.com/windowsatpservice/.default" @PSBoundParameters
+    connectOAuth2Impl "RjRbDefenderATPAuthHeaders" "https://securitycenter.onmicrosoft.com/windowsatpservice" @PSBoundParameters
 }
 
 
@@ -30,26 +30,51 @@ function connectOAuth2Impl
     [switch] $ReturnAuthHeaders
 ) {
 
+    $requestNewToken = $false
+
+    # check for expiration
     if ($Force -or -not (Test-Path "Variable:Script:$tokenVariableName")) {
+        $requestNewToken = $true
+    }
+
+    elseif (Test-Path "Variable:Script:$tokenVariableName") {
+        $existingTokenExpiration = (Get-Variable -Scope Script -Name "${tokenVariableName}Expiration" -ValueOnly)
+        if ([DateTimeOffset]::UtcNow.AddMinutes(15) -gt $existingTokenExpiration) {
+            Write-RjRbLog "Found existing token which will expire soon ($($existingTokenExpiration.ToString('u'))), requesting new token."
+            $requestNewToken = $true
+        }
+        else {
+            Write-RjRbLog "Found existing token which is still valid (until $($existingTokenExpiration.ToString('u'))), skipping new request."
+        }
+    }
+
+    if ($requestNewToken) {
 
         # see RealmJoin.RunbookHelper.psm1
         $Global:VerbosePreference = "SilentlyContinue"
 
-        $autoCon = getAutomationConnectionOrFromLocalCertificate $AutomationConnectionName
-
-        $certPsPath = "Cert:\CurrentUser\My\$($autoCon.CertificateThumbprint)"
-        Write-RjRbLog "Getting certificate (and key) from '$certPsPath'"
-        $cert = Get-Item $certPsPath
-
-        $getAuthTokenParams = [ordered]@{
-            TenantId    = $autoCon.TenantId
-            AppClientId = $autoCon.ApplicationId
-            CertWithKey = $cert
-            scope       = $scope
+        Write-RjRbLog "Requesting OAuth2 token for scope '$scope'"
+        if (checkIfManagedIdentityShouldBeUsed) {
+            $tokenResult = requestOAuth2AccessTokenFromManagedIdentity -Scope $scope
         }
-        $tokenResult = requestOAuth2AccessToken @getAuthTokenParams
+        else {
+            $autoCon = getAutomationConnectionOrFromLocalCertificate $AutomationConnectionName
 
-        Set-Variable -Scope Script -Name $tokenVariableName -Value @{ Authorization = "Bearer $($tokenResult.access_token)" }
+            $certPsPath = "Cert:\CurrentUser\My\$($autoCon.CertificateThumbprint)"
+            Write-RjRbLog "Getting certificate (and key) from '$certPsPath'"
+            $cert = Get-Item $certPsPath
+
+            $getAuthTokenParams = [ordered]@{
+                TenantId    = $autoCon.TenantId
+                AppClientId = $autoCon.ApplicationId
+                CertWithKey = $cert
+                scope       = $scope
+            }
+            $tokenResult = requestOAuth2AccessTokenFromAad @getAuthTokenParams
+        }
+
+        Set-Variable -Scope Script -Name $tokenVariableName -Value @{ Authorization = $tokenResult.Authorization }
+        Set-Variable -Scope Script -Name "${tokenVariableName}Expiration" -Value $tokenResult.Expiration
     }
 
     if ($ReturnAuthHeaders) {
@@ -57,7 +82,7 @@ function connectOAuth2Impl
     }
 }
 
-function requestOAuth2AccessToken(
+function requestOAuth2AccessTokenFromAad(
     [string] $tenantId,
     [string] $appClientId,
     [System.Security.Cryptography.X509Certificates.X509Certificate2] $certWithKey,
@@ -73,7 +98,7 @@ function requestOAuth2AccessToken(
         Method = "POST"
         Uri    = $oauthUri
         Body   = [ordered]@{ 
-            scope                 = $scope # property name would need to be 'resource' instead of 'scope' for the old AAD endpoint (without /v2.0/)
+            scope                 = "${scope}/.default" # see https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-permissions-and-consent#the-default-scope
             client_id             = $appClientId
             client_assertion_type = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
             client_assertion      = $jwt
@@ -82,18 +107,39 @@ function requestOAuth2AccessToken(
     }
     $result = Invoke-RjRbRestMethod @invokeRestParams
 
-    if ($DebugPreference -ne [Management.Automation.ActionPreference]::SilentlyContinue) {
-        function convertFromBase64UrlString ($in) {
-            $in = $in -replace '-', '+' -replace '_', '/'
-            if ($in.Length % 4) { $in += ('=' * (4 - $in.Length % 4)) }
-            return [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($in))
-        }
-        $tokenParts = $result.access_token.Split('.')
-        Write-RjRbDebug "access_token header" (convertFromBase64UrlString $tokenParts[0] | ConvertFrom-Json)
-        Write-RjRbDebug "access_token payload" (convertFromBase64UrlString $tokenParts[1] | ConvertFrom-Json)
-    }
+    return (refineOAuth2AccessToken $result.access_token)
+}
 
-    return $result
+function requestOAuth2AccessTokenFromManagedIdentity(
+    [string] $scope
+) {
+
+    $invokeRestParams = [ordered]@{
+        Uri     = "$($env:IDENTITY_ENDPOINT)?resource=$scope"
+        Headers = @{'X-IDENTITY-HEADER' = $env:IDENTITY_HEADER; 'Metadata' = 'True' }
+    }
+    $result = Invoke-RjRbRestMethod @invokeRestParams
+
+    return (refineOAuth2AccessToken $result.access_token)
+}
+
+function refineOAuth2AccessToken([string] $accessToken) {
+
+    $tokenParts = $accessToken.Split('.')
+    $tokenHeader = convertFromBase64UrlString $tokenParts[0] | ConvertFrom-Json
+    Write-RjRbDebug "access_token header" $tokenHeader
+    $tokenPayload = convertFromBase64UrlString $tokenParts[1] | ConvertFrom-Json
+    Write-RjRbDebug "access_token payload" $tokenPayload
+
+    Set-StrictMode -Version 1 # allow access to non-existent properties (local function scope only)
+    $expiration = [DateTimeOffset]::FromUnixTimeSeconds($tokenPayload.exp)
+    $rolesString = $(if ($tokenPayload.roles) { $tokenPayload.roles -join ', ' } else { "(none)" })
+    Write-RjRbLog "Received token, expiration: $($expiration.ToString('u')), roles: $rolesString"
+
+    return @{
+        Authorization = "$($result.token_type) $($result.access_token)"
+        Expiration    = $expiration
+    }
 }
 
 # based on https://github.com/SP3269/posh-jwt
@@ -105,18 +151,6 @@ function createSignedJwt(
 
     $rsaPrivateKey = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($certWithKey)
     if (-not $rsaPrivateKey) { throw [ArgumentNullException]::new("rsaPrivateKey") }
-
-    function convertToBase64UrlString ($in) {
-        if ($in -is [string]) {
-            $in = [System.Text.Encoding]::UTF8.GetBytes($in)
-        }
-        if ($in -is [byte[]]) {
-            return [Convert]::ToBase64String($in) -replace '\+', '-' -replace '/', '_' -replace '='
-        }
-        else {
-            throw [InvalidOperationException]::new($in.GetType())
-        }
-    }
 
     $thumbprintBytes = [byte[]] ($certWithKey.Thumbprint -replace '..', '0x$&,' -split ',' -ne '')
     $header = [ordered]@{
@@ -146,4 +180,28 @@ function createSignedJwt(
     Write-RjRbDebug -Data @{ JWT = $jwt }
 
     return $jwt
+}
+
+function convertToBase64UrlString ([object] $in) {
+
+    if ($in -is [string]) {
+        $in = [System.Text.Encoding]::UTF8.GetBytes($in)
+    }
+
+    if ($in -is [byte[]]) {
+        return [Convert]::ToBase64String($in) -replace '\+', '-' -replace '/', '_' -replace '='
+    }
+    else {
+        throw [InvalidOperationException]::new($in.GetType())
+    }
+}
+
+function convertFromBase64UrlString ([string] $in) {
+
+    $in = $in -replace '-', '+' -replace '_', '/'
+    if ($in.Length % 4) {
+        $in += ('=' * (4 - $in.Length % 4)) 
+    }
+
+    return [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($in))
 }

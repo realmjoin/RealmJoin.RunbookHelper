@@ -2,7 +2,7 @@
 
 @{
     RootModule        = 'RealmJoin.RunbookHelper.psm1'
-    ModuleVersion     = '0.7.0'
+    ModuleVersion     = '0.8.0'
     GUID              = '50c59179-6cb8-4968-bf76-e7de04f02957'
     Author            = 'glueckkanja-gab AG'
     CompanyName       = 'glueckkanja-gab AG'
@@ -24,7 +24,7 @@
     PrivateData       = @{
         PSData = @{
             ProjectUri = 'https://github.com/realmjoin/RealmJoin.RunbookHelper'
-            # Prerelease = 'rc0'
+            Prerelease = 'rc1'
         }
     }
 }
