@@ -30,7 +30,25 @@ function connectOAuth2Impl
     [switch] $ReturnAuthHeaders
 ) {
 
+    $requestNewToken = $false
+
+    # check for expiration
     if ($Force -or -not (Test-Path "Variable:Script:$tokenVariableName")) {
+        $requestNewToken = $true
+    }
+
+    elseif (Test-Path "Variable:Script:$tokenVariableName") {
+        $existingTokenExpiration = (Get-Variable -Scope Script -Name "${tokenVariableName}Expiration" -ValueOnly)
+        if ([DateTimeOffset]::UtcNow.AddMinutes(15) -gt $existingTokenExpiration) {
+            Write-RjRbLog "Found existing token which will expire soon ($($existingTokenExpiration.ToString('u'))), requesting new token."
+            $requestNewToken = $true
+        }
+        else {
+            Write-RjRbLog "Found existing token which is still valid (until $($existingTokenExpiration.ToString('u'))), skipping new request."
+        }
+    }
+
+    if ($requestNewToken) {
 
         # see RealmJoin.RunbookHelper.psm1
         $Global:VerbosePreference = "SilentlyContinue"
@@ -49,7 +67,8 @@ function connectOAuth2Impl
         }
         $tokenResult = requestOAuth2AccessToken @getAuthTokenParams
 
-        Set-Variable -Scope Script -Name $tokenVariableName -Value @{ Authorization = "Bearer $($tokenResult.access_token)" }
+        Set-Variable -Scope Script -Name $tokenVariableName -Value @{ Authorization = $tokenResult.Authorization }
+        Set-Variable -Scope Script -Name "${tokenVariableName}Expiration" -Value $tokenResult.Expiration
     }
 
     if ($ReturnAuthHeaders) {
@@ -82,18 +101,20 @@ function requestOAuth2AccessToken(
     }
     $result = Invoke-RjRbRestMethod @invokeRestParams
 
-    if ($DebugPreference -ne [Management.Automation.ActionPreference]::SilentlyContinue) {
-        function convertFromBase64UrlString ($in) {
-            $in = $in -replace '-', '+' -replace '_', '/'
-            if ($in.Length % 4) { $in += ('=' * (4 - $in.Length % 4)) }
-            return [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($in))
-        }
-        $tokenParts = $result.access_token.Split('.')
-        Write-RjRbDebug "access_token header" (convertFromBase64UrlString $tokenParts[0] | ConvertFrom-Json)
-        Write-RjRbDebug "access_token payload" (convertFromBase64UrlString $tokenParts[1] | ConvertFrom-Json)
-    }
+    $tokenParts = $result.access_token.Split('.')
+    $tokenHeader = convertFromBase64UrlString $tokenParts[0] | ConvertFrom-Json
+    Write-RjRbDebug "access_token header" $tokenHeader
+    $tokenPayload = convertFromBase64UrlString $tokenParts[1] | ConvertFrom-Json
+    Write-RjRbDebug "access_token payload" $tokenPayload
 
-    return $result
+    $expiration = [DateTimeOffset]::FromUnixTimeSeconds($tokenPayload.exp)
+    $roles = $tokenPayload.roles
+    Write-RjRbLog "Received token, expiration: $($expiration.ToString('u')), roles: $($roles -join ',')"
+
+    return @{
+        Authorization = "$($result.token_type) $($result.access_token)"
+        Expiration    = $expiration
+    }
 }
 
 # based on https://github.com/SP3269/posh-jwt
@@ -105,18 +126,6 @@ function createSignedJwt(
 
     $rsaPrivateKey = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($certWithKey)
     if (-not $rsaPrivateKey) { throw [ArgumentNullException]::new("rsaPrivateKey") }
-
-    function convertToBase64UrlString ($in) {
-        if ($in -is [string]) {
-            $in = [System.Text.Encoding]::UTF8.GetBytes($in)
-        }
-        if ($in -is [byte[]]) {
-            return [Convert]::ToBase64String($in) -replace '\+', '-' -replace '/', '_' -replace '='
-        }
-        else {
-            throw [InvalidOperationException]::new($in.GetType())
-        }
-    }
 
     $thumbprintBytes = [byte[]] ($certWithKey.Thumbprint -replace '..', '0x$&,' -split ',' -ne '')
     $header = [ordered]@{
@@ -146,4 +155,28 @@ function createSignedJwt(
     Write-RjRbDebug -Data @{ JWT = $jwt }
 
     return $jwt
+}
+
+function convertToBase64UrlString ([object] $in) {
+
+    if ($in -is [string]) {
+        $in = [System.Text.Encoding]::UTF8.GetBytes($in)
+    }
+
+    if ($in -is [byte[]]) {
+        return [Convert]::ToBase64String($in) -replace '\+', '-' -replace '/', '_' -replace '='
+    }
+    else {
+        throw [InvalidOperationException]::new($in.GetType())
+    }
+}
+
+function convertFromBase64UrlString ([string] $in) {
+
+    $in = $in -replace '-', '+' -replace '_', '/'
+    if ($in.Length % 4) {
+        $in += ('=' * (4 - $in.Length % 4)) 
+    }
+
+    return [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($in))
 }
