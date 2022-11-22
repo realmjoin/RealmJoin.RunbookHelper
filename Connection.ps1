@@ -8,14 +8,30 @@ function getAutomationConnectionOrFromLocalCertificate([string] $AutomationConne
     }
 }
 
-function checkIfManagedIdentityShouldBeUsed() {
+function checkIfManagedIdentityShouldBeUsed([string] $serviceNameStub, [bool] $default) {
 
+    $tryManagedIdentity = $default
     if ($RjRbRunningInAzure) {
-        $ignoreManagedIdentityValue = Get-AutomationVariable 'RJRB_IGNORE_MANAGED_IDENTITY' -EA 0
-        Write-RjRbDebug -Data @{ ignoreManagedIdentityValue = $ignoreManagedIdentityValue }
-        if ([bool][int]$ignoreManagedIdentityValue) {
-            return $false
+        $enforceManagedIdentityValue = Get-AutomationVariable "RJRB_ENFORCE_MANAGED_IDENTITY" -EA 0
+        $enforceManagedIdentityServiceValue = Get-AutomationVariable "RJRB_ENFORCE_MANAGED_IDENTITY_${serviceNameStub}" -EA 0
+        $ignoreManagedIdentityValue = Get-AutomationVariable "RJRB_IGNORE_MANAGED_IDENTITY" -EA 0
+        $ignoreManagedIdentityServiceValue = Get-AutomationVariable "RJRB_IGNORE_MANAGED_IDENTITY_${serviceNameStub}" -EA 0
+        Write-RjRbDebug -Data @{ 
+            enforceManagedIdentityValue        = $enforceManagedIdentityValue
+            enforceManagedIdentityServiceValue = $enforceManagedIdentityServiceValue
+            ignoreManagedIdentityValue         = $ignoreManagedIdentityValue
+            ignoreManagedIdentityServiceValue  = $ignoreManagedIdentityServiceValue
         }
+        if ([bool][int]$enforceManagedIdentityValue -or [bool][int]$enforceManagedIdentityServiceValue) {
+            $tryManagedIdentity = $true
+        }
+        elseif ([bool][int]$ignoreManagedIdentityValue -or [bool][int]$ignoreManagedIdentityServiceValue) {
+            $tryManagedIdentity = $false
+        }
+    }
+    if (-not $tryManagedIdentity) {
+        Write-RjRbLog "Not trying to use Azure managed identity (service ${serviceNameStub})"
+        return $false
     }
 
     try {
@@ -29,7 +45,10 @@ function checkIfManagedIdentityShouldBeUsed() {
     Write-RjRbDebug -Data @{ managedIdentityAvailable = $managedIdentityAvailable }
 
     if ($managedIdentityAvailable) {
-        Write-RjRbLog "Using Azure managed identity"
+        Write-RjRbLog "Found Azure managed identity and using it (service ${serviceNameStub})"
+    }
+    else {
+        Write-RjRbLog "Did not find Azure managed identity (service ${serviceNameStub})"
     }
 
     return $managedIdentityAvailable
