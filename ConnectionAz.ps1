@@ -8,7 +8,7 @@ function Connect-RjRbAzAccount {
     $Global:VerbosePreference = "SilentlyContinue"
 
     $connectParams = @{}
-    if (checkIfManagedIdentityShouldBeUsed) {
+    if (checkIfManagedIdentityShouldBeUsed 'AZ' $true) {
         $connectParams += @{ Identity = $true }
     }
     else {

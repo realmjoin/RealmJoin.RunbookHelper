@@ -6,7 +6,7 @@ function Connect-RjRbGraph {
         [switch] $ReturnAuthHeaders
     )
 
-    connectOAuth2Impl "RjRbGraphAuthHeaders" "https://graph.microsoft.com" @PSBoundParameters
+    connectOAuth2Impl "RjRbGraphAuthHeaders" "https://graph.microsoft.com" "GRAPH" @PSBoundParameters
 }
 
 function Connect-RjRbDefenderATP {
@@ -17,7 +17,7 @@ function Connect-RjRbDefenderATP {
         [switch] $ReturnAuthHeaders
     )
 
-    connectOAuth2Impl "RjRbDefenderATPAuthHeaders" "https://securitycenter.onmicrosoft.com/windowsatpservice" @PSBoundParameters
+    connectOAuth2Impl "RjRbDefenderATPAuthHeaders" "https://securitycenter.onmicrosoft.com/windowsatpservice" "ATP" @PSBoundParameters
 }
 
 
@@ -25,6 +25,7 @@ function connectOAuth2Impl
 (
     [string] $tokenVariableName,
     [string] $scope,
+    [string] $serviceNameStub,
     [string] $AutomationConnectionName = "AzureRunAsConnection",
     [switch] $Force,
     [switch] $ReturnAuthHeaders
@@ -54,7 +55,7 @@ function connectOAuth2Impl
         $Global:VerbosePreference = "SilentlyContinue"
 
         Write-RjRbLog "Requesting OAuth2 token for scope '$scope'"
-        if (checkIfManagedIdentityShouldBeUsed) {
+        if (checkIfManagedIdentityShouldBeUsed $serviceNameStub $true) {
             $tokenResult = requestOAuth2AccessTokenFromManagedIdentity -Scope $scope
         }
         else {
