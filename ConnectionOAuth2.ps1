@@ -55,12 +55,11 @@ function connectOAuth2Impl
         $Global:VerbosePreference = "SilentlyContinue"
 
         Write-RjRbLog "Requesting OAuth2 token for scope '$scope'"
-        if (checkIfManagedIdentityShouldBeUsed $serviceNameStub $true) {
+        $autoCon = getAutomationConnectionOrFromLocalCertificate $AutomationConnectionName
+        if ((-not $autoCon) -or (checkIfManagedIdentityShouldBeUsed $serviceNameStub $true)) {
             $tokenResult = requestOAuth2AccessTokenFromManagedIdentity -Scope $scope
         }
         else {
-            $autoCon = getAutomationConnectionOrFromLocalCertificate $AutomationConnectionName
-
             $certPsPath = "Cert:\CurrentUser\My\$($autoCon.CertificateThumbprint)"
             Write-RjRbLog "Getting certificate (and key) from '$certPsPath'"
             $cert = Get-Item $certPsPath

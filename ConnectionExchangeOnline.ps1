@@ -7,12 +7,12 @@ function Connect-RjRbExchangeOnline {
     # see RealmJoin.RunbookHelper.psm1
     $Global:VerbosePreference = "SilentlyContinue"
 
+    $autoCon = getAutomationConnectionOrFromLocalCertificate $AutomationConnectionName
     $connectParams = @{ ShowBanner = $false }
-    if (checkIfManagedIdentityShouldBeUsed 'EXO' $false) {
+    if ((-not $autoCon) -or (checkIfManagedIdentityShouldBeUsed 'EXO' $false)) {
         $connectParams += @{ ManagedIdentity = $true }
     }
     else {
-        $autoCon = getAutomationConnectionOrFromLocalCertificate $AutomationConnectionName
         $connectParams += @{ 
             Organization          = $autoCon.TenantId
             AppId                 = $autoCon.ApplicationId

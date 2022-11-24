@@ -1,7 +1,7 @@
 function getAutomationConnectionOrFromLocalCertificate([string] $AutomationConnectionName) {
     if ($RjRbRunningInAzure) {
         Write-RjRbLog "Getting automation connection '$AutomationConnectionName'"
-        return Get-AutomationConnection -Name $AutomationConnectionName
+        return (Get-AutomationConnection -Name $AutomationConnectionName -ErrorAction SilentlyContinue)
     }
     else {
         return devGetAutomationConnectionFromLocalCertificate -Name $AutomationConnectionName

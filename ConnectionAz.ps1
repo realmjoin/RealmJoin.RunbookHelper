@@ -7,12 +7,13 @@ function Connect-RjRbAzAccount {
     # see RealmJoin.RunbookHelper.psm1
     $Global:VerbosePreference = "SilentlyContinue"
 
+    $autoCon = getAutomationConnectionOrFromLocalCertificate $AutomationConnectionName
     $connectParams = @{}
-    if (checkIfManagedIdentityShouldBeUsed 'AZ' $true) {
+    if ((-not $autoCon) -or (checkIfManagedIdentityShouldBeUsed 'AZ' $true)) {
         $connectParams += @{ Identity = $true }
     }
     else {
-        $connectParams += getAutomationConnectionOrFromLocalCertificate $AutomationConnectionName
+        $connectParams += $autoCon
     }
 
     Write-RjRbLog "Connecting with Az module" $connectParams
