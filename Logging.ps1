@@ -40,10 +40,10 @@ function Write-RjRbLogImpl {
             $Message += ": "
         }
         if ($Data -is [Hashtable] -and $Data.Count -eq 1) {
-            $Message += "$($Data.Keys[0]): $($Data.Values[0] | ConvertTo-Json)"
+            $Message += "$($Data.Keys[0]): $($Data.Values[0] | ConvertTo-Json -Depth 20)"
         }
         else {
-            $Message += ($Data | ConvertTo-Json)
+            $Message += ($Data | ConvertTo-Json -Depth 20)
         }
     }
 
