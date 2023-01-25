@@ -166,7 +166,7 @@ function invokeRjRbRestMethodInternal {
     if ($JsonEncodeBody -and $Body -and (-not ($Body -is [byte[]] -or $Body -is [IO.Stream]))) {
         # need to explicetly set charset in ContentType for Invoke-RestMethod to detect it and to correctly encode JSON string
         $invokeArguments['ContentType'] = "application/json; charset=UTF-8"
-        $invokeArguments['Body'] = $Body | ConvertTo-Json
+        $invokeArguments['Body'] = $Body | ConvertTo-Json -Depth 20
     }
     if ($InFile -and -not $ContentType) {
         $invokeArguments['ContentType'] = [Web.MimeMapping]::GetMimeMapping($InFile)
