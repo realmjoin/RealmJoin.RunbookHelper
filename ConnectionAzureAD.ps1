@@ -7,11 +7,13 @@ function Connect-RjRbAzureAD {
     # see RealmJoin.RunbookHelper.psm1
     $Global:VerbosePreference = "SilentlyContinue"
 
-    $autoCon = getAutomationConnectionOrFromLocalCertificate $AutomationConnectionName
+    # Azure AD PowerShell does not support authentication by managed identity out of the box and is planned for deprecation.
+    # see https://learn.microsoft.com/en-us/powershell/azure/active-directory/overview?view=azureadps-2.0
+    $connectArgs = getConnectArgs 'AAD' $false $AutomationConnectionName -automationConnectionOnly
 
-    Write-RjRbLog "Connecting with AzureAD module" $autoCon
-    Connect-AzureAD -TenantId $autoCon.TenantId -ApplicationId $autoCon.ApplicationId `
-        -CertificateThumbprint $autoCon.CertificateThumbprint | Out-Null
+    Write-RjRbLog "Connecting with AzureAD module" $connectArgs
+    Connect-AzureAD -TenantId $connectArgs.TenantId -ApplicationId $connectArgs.ApplicationId `
+        -CertificateThumbprint $connectArgs.CertificateThumbprint | Out-Null
 }
 
 function Get-RjRbAzureADTenantDetail {

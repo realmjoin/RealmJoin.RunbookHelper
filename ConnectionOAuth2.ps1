@@ -55,19 +55,18 @@ function connectOAuth2Impl
         $Global:VerbosePreference = "SilentlyContinue"
 
         Write-RjRbLog "Requesting OAuth2 token for scope '$scope'"
-        if (checkIfManagedIdentityShouldBeUsed $serviceNameStub $true) {
+        $connectArgs = getConnectArgs $serviceNameStub $true $AutomationConnectionName
+        if ($connectArgs['Identity']) {
             $tokenResult = requestOAuth2AccessTokenFromManagedIdentity -Scope $scope
         }
         else {
-            $autoCon = getAutomationConnectionOrFromLocalCertificate $AutomationConnectionName
-
-            $certPsPath = "Cert:\CurrentUser\My\$($autoCon.CertificateThumbprint)"
+            $certPsPath = "Cert:\CurrentUser\My\$($connectArgs.CertificateThumbprint)"
             Write-RjRbLog "Getting certificate (and key) from '$certPsPath'"
             $cert = Get-Item $certPsPath
 
             $getAuthTokenParams = [ordered]@{
-                TenantId    = $autoCon.TenantId
-                AppClientId = $autoCon.ApplicationId
+                TenantId    = $connectArgs.TenantId
+                AppClientId = $connectArgs.ApplicationId
                 CertWithKey = $cert
                 scope       = $scope
             }
@@ -98,7 +97,7 @@ function requestOAuth2AccessTokenFromAad(
     $invokeRestParams = [ordered]@{
         Method = "POST"
         Uri    = $oauthUri
-        Body   = [ordered]@{ 
+        Body   = [ordered]@{
             scope                 = "${scope}/.default" # see https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-permissions-and-consent#the-default-scope
             client_id             = $appClientId
             client_assertion_type = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
@@ -201,7 +200,7 @@ function convertFromBase64UrlString ([string] $in) {
 
     $in = $in -replace '-', '+' -replace '_', '/'
     if ($in.Length % 4) {
-        $in += ('=' * (4 - $in.Length % 4)) 
+        $in += ('=' * (4 - $in.Length % 4))
     }
 
     return [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($in))
