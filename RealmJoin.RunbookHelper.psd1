@@ -24,7 +24,7 @@
     PrivateData       = @{
         PSData = @{
             ProjectUri = 'https://github.com/realmjoin/RealmJoin.RunbookHelper'
-            Prerelease = 'rc3'
+            # Prerelease = 'rc3'
         }
     }
 }
