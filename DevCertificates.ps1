@@ -3,10 +3,10 @@ Create local certificate for development purposes
 Values in subject:
     CN: Automation Connection Name
     OU: ApplicationId (client id guid)
-    DC: TenantId (guid or string)
+    DC: TenantId (guid)
     O:  SubscriptionId (guid)
 
-New-SelfSignedCertificate -Subject 'CN=AzureRunAsConnection, OU=d7bd21d4-27ca-4f35-b108-284b283a4754, DC=gkcorellia.onmicrosoft.com, O=e0e2ba22-1184-4254-90a4-cddcf7f39886' `
+New-SelfSignedCertificate -Subject 'CN=AzureRunAsConnection, OU=21cf3618-9cf9-49a4-bd12-a29e297254b5, DC=810017af-c1d4-4a3b-9e18-d693c12b0df1, O=e0e2ba22-1184-4254-90a4-cddcf7f39886' `
     -CertStoreLocation "cert:\CurrentUser\My" -NotAfter (Get-Date).AddYears(10) -KeySpec Signature | `
     Export-Certificate -FilePath "AzureRunAsConnection.cer"
 

@@ -7,9 +7,8 @@ function Connect-RjRbAzAccount {
     # see RealmJoin.RunbookHelper.psm1
     $Global:VerbosePreference = "SilentlyContinue"
 
-    $autoCon = getAutomationConnectionOrFromLocalCertificate $AutomationConnectionName
+    $connectArgs = getConnectArgs 'AZ' $true $AutomationConnectionName
 
-    Write-RjRbLog "Connecting with Az module" $autoCon
-    Connect-AzAccount -ServicePrincipal -TenantId $autoCon.TenantId -ApplicationId $autoCon.ApplicationId `
-        -CertificateThumbprint $autoCon.CertificateThumbprint | Out-Null
+    Write-RjRbLog "Connecting with Az module" $connectArgs
+    Connect-AzAccount @connectArgs | Out-Null
 }
