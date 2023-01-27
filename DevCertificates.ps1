@@ -15,6 +15,19 @@ and you're good to go and test with exactly the same identity that the runbooks 
 
 #>
 
+function devCreateLocalCertificate {
+    param(
+        [string]$CN = "AzureRunAsConnection",
+        [string]$clientId = "d7bd21d4-27ca-4f35-b108-284b283a4754",
+        [string]$tenantId = "gkcorellia.onmicrosoft.com",
+        [string]$sucbriptionId = "e0e2ba22-1184-4254-90a4-cddcf7f39886",
+        [string]$certStoreLocation = "cert:\CurrentUser\My",
+        [string]$outFile = "AzureRunAsConnection.cer"
+    )
+
+    New-SelfSignedCertificate -Subject "CN=$CN, OU=$clientId, DC=$tenantId, O=$sucbriptionId" -CertStoreLocation $certStoreLocation -NotAfter (Get-Date).AddYears(10) -KeySpec Signature | Export-Certificate -FilePath $outFile
+}
+
 function devGetAutomationConnectionFromLocalCertificate {
     param (
         [string] $Name = "AzureRunAsConnection"
