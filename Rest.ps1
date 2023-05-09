@@ -209,6 +209,10 @@ function invokeRjRbRestMethodInternal {
             # no need to write error details to log on SilentlyContinue or Ignore
             if ($errorAction -notin @([Management.Automation.ActionPreference]::SilentlyContinue, [Management.Automation.ActionPreference]::Ignore)) {
 
+                # avoid dumping full credentials outside of debug
+                if ($invokeArguments['Headers'] -and $invokeArguments['Headers']['Authorization']) {
+                    $invokeArguments['Headers']['Authorization'] = $invokeArguments['Headers']['Authorization'] -replace '(?s)(?<=^\S+ \S{8}).*$', '...'
+                }
                 Write-RjRbLog "Invoke-RestMethod arguments" $invokeArguments -NoDebugOnly
 
                 # get error response if available
