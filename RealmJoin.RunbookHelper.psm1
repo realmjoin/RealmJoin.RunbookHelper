@@ -15,7 +15,10 @@ $ErrorActionPreference = "Stop"
 # module scope only
 Set-StrictMode -Version 3
 
-$Global:RjRbRunningInAzure = [bool]$env:AUTOMATION_ASSET_ACCOUNTID
+# Workaround: Detect Azure Env. using Get-AutomationVariable
+if ((Get-Command Get-AutomationVariable -ErrorAction SilentlyContinue) -or ($env:AUTOMATION_ASSET_ACCOUNTID)) { 
+    $Global:RjRbRunningInAzure = $true
+}
 
 . $PSScriptRoot\Logging.ps1
 

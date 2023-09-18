@@ -2,9 +2,9 @@ function getConnectArgs([string] $serviceNameStub, [bool] $preferManagedIdentity
 
     if ($RjRbRunningInAzure) {
 
-        # check if automation connection is available
-        $automationConnection = Get-AutomationConnection -Name $AutomationConnectionName -EA 0
-        $automationConnectionAvailable = [bool]$automationConnection
+        ## check if automation connection is available - Feature obsolote as of 2023-09-30
+        #$automationConnection = Get-AutomationConnection -Name $AutomationConnectionName -EA 0
+        $automationConnectionAvailable = $false
 
         if ($automationConnectionOnly) {
             if ($automationConnectionAvailable) {
