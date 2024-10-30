@@ -26,7 +26,21 @@ function Invoke-RjRbRestMethodGraph {
         $invokeArguments['Headers'] = $Script:RjRbGraphAuthHeaders
     }
 
-    Invoke-RjRbRestMethod -JsonEncodeBody @invokeArguments
+    try {
+        Invoke-RjRbRestMethod -JsonEncodeBody @invokeArguments
+    }
+    catch {
+        # Will handle invalidated tokens here, as this is specific to Graph
+        if ($_.Exception.Response.StatusCode -eq 401) {
+            Write-RjRbLog "Received 401 from Graph, requesting new token."
+            Connect-RjRbGraph -Force
+            $invokeArguments.Headers.Authorization = $Script:RjRbGraphAuthHeaders.Authorization
+            Invoke-RjRbRestMethod -JsonEncodeBody @invokeArguments
+        }
+        else {
+            throw $_
+        }
+    }
 }
 
 function Invoke-RjRbRestMethodDefenderATP {
