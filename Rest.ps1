@@ -209,11 +209,13 @@ function invokeRjRbRestMethodInternal {
             # no need to write error details to log on SilentlyContinue or Ignore
             if ($errorAction -notin @([Management.Automation.ActionPreference]::SilentlyContinue, [Management.Automation.ActionPreference]::Ignore)) {
 
-                # avoid dumping full credentials outside of debug
-                if ($invokeArguments['Headers'] -and $invokeArguments['Headers']['Authorization']) {
-                    $invokeArguments['Headers']['Authorization'] = $invokeArguments['Headers']['Authorization'] -replace '(?s)(?<=^\S+ \S{8}).*$', '...'
+                # avoid dumping full credentials outside of debug (use .Clone() to ensure to _not_ modify args for subsequent uses)
+                $invokeArgsSanitized = $invokeArguments.Clone()
+                if ($invokeArgsSanitized['Headers'] -and $invokeArgsSanitized['Headers']['Authorization']) {
+                    $invokeArgsSanitized['Headers'] = $invokeArgsSanitized['Headers'].Clone()
+                    $invokeArgsSanitized['Headers']['Authorization'] = $invokeArgsSanitized['Headers']['Authorization'] -replace '(?s)(?<=^\S+ \S{8}).*$', '...'
                 }
-                Write-RjRbLog "Invoke-RestMethod arguments" $invokeArguments -NoDebugOnly
+                Write-RjRbLog "Invoke-RestMethod arguments" $invokeArgsSanitized -NoDebugOnly
 
                 # get error response if available
                 if ($isWebException) {
