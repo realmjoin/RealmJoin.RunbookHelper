@@ -38,3 +38,4 @@ else {
 . $PSScriptRoot\InternalHelpers.ps1
 . $PSScriptRoot\Rest.ps1
 . $PSScriptRoot\MailReport.ps1
+. $PSScriptRoot\FileReport.ps1
