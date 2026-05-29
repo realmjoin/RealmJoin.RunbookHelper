@@ -1,23 +1,37 @@
-name: Publish using .NET Core
+name: Publish RealmJoin.RunbookHelper PowerShell Module
 on:
   push:
     tags:
-      - v[0-9]+.[0-9]+.[0-9]+-[a-z0-9]+ # preleases
+      - v[0-9]+.[0-9]+.[0-9]+-[a-z0-9]+
       - v[0-9]+.[0-9]+.[0-9]+
-
+permissions:
+  contents: read
 jobs:
-  build:
-
-    runs-on: windows-latest
-
+  publish:
+    runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v6
-    - name: Setup .NET Core
-      uses: actions/setup-dotnet@v1
-      with:
-        dotnet-version: 3.1.x
-    - name: Push using Publish-Module
-      env:
-        NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
-      run: |
-        pwsh -Command Publish-Module -Path . -NuGetApiKey "$env:NUGET_API_KEY"
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Validate manifest
+        shell: pwsh
+        run: Test-ModuleManifest ./RealmJoin.RunbookHelper.psd1
+
+      - name: Check version matches tag
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}".TrimStart('v')
+          $ver = (Test-ModuleManifest ./RealmJoin.RunbookHelper.psd1).Version.ToString()
+          if ($tag.Split('-')[0] -ne $ver) {
+            throw "Tag $tag does not match ModuleVersion $ver"
+          }
+
+      - name: Stage and publish
+        shell: pwsh
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          $dst = Join-Path $env:RUNNER_TEMP 'RealmJoin.RunbookHelper'
+          New-Item -ItemType Directory -Path $dst | Out-Null
+          Copy-Item *.ps1, *.psd1, *.psm1 $dst
+          Copy-Item Assets $dst -Recurse
+          Publish-PSResource -Path $dst -ApiKey $env:NUGET_API_KEY -Repository PSGallery -Verbose
