@@ -1,14 +1,17 @@
 # RealmJoin.RunbookHelper
+
 Helps to integrate Azure Automation scripts with RealmJoin.
 
-# Powershell Gallery
-https://www.powershellgallery.com/packages/RealmJoin.RunbookHelper/
+## Powershell Gallery
 
-# Usage in Azure Automation
+[https://www.powershellgallery.com/packages/RealmJoin.RunbookHelper/](https://www.powershellgallery.com/packages/RealmJoin.RunbookHelper/)
+
+## Usage in Azure Automation
+
 Consider a runbook "Group: Add guest to group". By using `Use-RjRbInterface` RealmJoin will show an enhanced UI when running this script.
 
 ```powershell
-#Requires -Module @{ModuleName = "RealmJoin.RunbookHelper"; ModuleVersion = "0.3.0" }
+#Requires -Module @{ModuleName = "RealmJoin.RunbookHelper"; ModuleVersion = "0.8.6" }
 
 param(
     [Parameter(Mandatory = $true)]
@@ -33,7 +36,8 @@ By using `Use-RjRbInterface Graph` a rich selector for `$GuestID` will be shown,
 
 Finally, since `$ValidUntil` is of type `[DateTime]` a date and a time picker will be shown by default, however `Use-RjRbInterface` narrows this down to a single date picker with additional `MaxValue` constraint.
 
-# Available options
+## Available options
+
 ```
 NAME
     Use-RjRbInterface
