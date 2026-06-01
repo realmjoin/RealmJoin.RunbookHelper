@@ -30,6 +30,7 @@ jobs:
         env:
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
         run: |
+          Register-PSResourceRepository -PSGallery -Trusted
           $dst = Join-Path $env:RUNNER_TEMP 'RealmJoin.RunbookHelper'
           New-Item -ItemType Directory -Path $dst | Out-Null
           Copy-Item *.ps1, *.psd1, *.psm1 $dst
