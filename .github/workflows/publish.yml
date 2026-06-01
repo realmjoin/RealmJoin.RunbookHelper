@@ -55,6 +55,16 @@ jobs:
             throw "Tag $tag does not match ModuleVersion $ver"
           }
 
+      # PSResourceGet (1.1.1 on the Linux runner) throws "Could not find a part of
+      # the path .../PSResourceGet/PSResourceRepository.xml" because the store
+      # directory does not exist on a clean runner. Creating the directory lets the
+      # absent store fall back to the built-in PSGallery default. Note: do NOT
+      # Register-PSResourceRepository -PSGallery - it is a built-in default and
+      # re-registering throws "already exists".
+      - name: Prepare PSResourceGet store
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force -Path (Join-Path $HOME '.local/share/PSResourceGet') | Out-Null
+
       # Runs on every push as a build/packaging smoke test (no deploy).
       - name: Stage module
         shell: pwsh
@@ -66,6 +76,15 @@ jobs:
           Write-Host "Staged module contents:"
           Get-ChildItem -Recurse $dst | ForEach-Object { Write-Host "  $($_.FullName)" }
 
+      # Non-tag runs: exercise the full publish path (resolves PSGallery, packs the
+      # module) via -WhatIf so packaging problems surface on push without deploying.
+      - name: Publish dry-run
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        shell: pwsh
+        run: |
+          $dst = Join-Path $env:RUNNER_TEMP 'RealmJoin.RunbookHelper'
+          Publish-PSResource -Path $dst -ApiKey 'dryrun' -Repository PSGallery -WhatIf -Verbose
+
       # Deploy only on a release tag.
       - name: Publish to PSGallery
         if: startsWith(github.ref, 'refs/tags/')
@@ -73,6 +92,5 @@ jobs:
         env:
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
         run: |
-          Register-PSResourceRepository -PSGallery -Trusted
           $dst = Join-Path $env:RUNNER_TEMP 'RealmJoin.RunbookHelper'
           Publish-PSResource -Path $dst -ApiKey $env:NUGET_API_KEY -Repository PSGallery -Verbose
