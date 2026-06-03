@@ -1,9 +1,12 @@
 name: Publish RealmJoin.RunbookHelper PowerShell Module
 on:
   push:
+    branches:
+      - '**'
     tags:
       - v[0-9]+.[0-9]+.[0-9]+-[a-z0-9]+
       - v[0-9]+.[0-9]+.[0-9]+
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
@@ -12,27 +15,82 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
+      # Surfaces the runner's PSResourceGet version and repository-store state so
+      # we can diagnose the publish environment. Never blocks the run.
+      - name: Diagnostics
+        if: always()
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          Write-Host "=== PSVersionTable ==="
+          $PSVersionTable | Format-List | Out-String | Write-Host
+          Write-Host "=== OS ==="
+          Write-Host "OS=$([System.Environment]::OSVersion) RUNNER_OS=$env:RUNNER_OS"
+          Write-Host "=== PSResourceGet module(s) ==="
+          Get-Module -ListAvailable Microsoft.PowerShell.PSResourceGet |
+            Select-Object Name, Version, ModuleBase | Format-Table -AutoSize | Out-String | Write-Host
+          $store = Join-Path $HOME '.local/share/PSResourceGet'
+          $xml   = Join-Path $store 'PSResourceRepository.xml'
+          Write-Host "=== Repository store ==="
+          Write-Host "store dir: $store (exists=$(Test-Path $store))"
+          Write-Host "store xml: $xml (exists=$(Test-Path $xml))"
+          Write-Host "=== Get-PSResourceRepository ==="
+          Get-PSResourceRepository | Format-Table -AutoSize | Out-String | Write-Host
+
       - name: Validate manifest
         shell: pwsh
         run: Test-ModuleManifest ./RealmJoin.RunbookHelper.psd1
 
+      # Only meaningful on a release tag - on branch pushes github.ref_name is
+      # the branch name, which is not a version.
       - name: Check version matches tag
+        if: startsWith(github.ref, 'refs/tags/')
         shell: pwsh
+        env:
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          $tag = "${{ github.ref_name }}".TrimStart('v')
+          $tag = "$env:REF_NAME".TrimStart('v')
           $ver = (Test-ModuleManifest ./RealmJoin.RunbookHelper.psd1).Version.ToString()
           if ($tag.Split('-')[0] -ne $ver) {
             throw "Tag $tag does not match ModuleVersion $ver"
           }
 
-      - name: Stage and publish
+      # PSResourceGet (1.1.1 on the Linux runner) throws "Could not find a part of
+      # the path .../PSResourceGet/PSResourceRepository.xml" because the store
+      # directory does not exist on a clean runner. Creating the directory lets the
+      # absent store fall back to the built-in PSGallery default. Note: do NOT
+      # Register-PSResourceRepository -PSGallery - it is a built-in default and
+      # re-registering throws "already exists".
+      - name: Prepare PSResourceGet store
         shell: pwsh
-        env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: New-Item -ItemType Directory -Force -Path (Join-Path $HOME '.local/share/PSResourceGet') | Out-Null
+
+      # Runs on every push as a build/packaging smoke test (no deploy).
+      - name: Stage module
+        shell: pwsh
         run: |
-          Register-PSResourceRepository -PSGallery -Trusted
           $dst = Join-Path $env:RUNNER_TEMP 'RealmJoin.RunbookHelper'
           New-Item -ItemType Directory -Path $dst | Out-Null
           Copy-Item *.ps1, *.psd1, *.psm1 $dst
           Copy-Item Assets $dst -Recurse
+          Write-Host "Staged module contents:"
+          Get-ChildItem -Recurse $dst | ForEach-Object { Write-Host "  $($_.FullName)" }
+
+      # Non-tag runs: exercise the full publish path (resolves PSGallery, packs the
+      # module) via -WhatIf so packaging problems surface on push without deploying.
+      - name: Publish dry-run
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        shell: pwsh
+        run: |
+          $dst = Join-Path $env:RUNNER_TEMP 'RealmJoin.RunbookHelper'
+          Publish-PSResource -Path $dst -ApiKey 'dryrun' -Repository PSGallery -WhatIf -Verbose
+
+      # Deploy only on a release tag.
+      - name: Publish to PSGallery
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          $dst = Join-Path $env:RUNNER_TEMP 'RealmJoin.RunbookHelper'
           Publish-PSResource -Path $dst -ApiKey $env:NUGET_API_KEY -Repository PSGallery -Verbose
