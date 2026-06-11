@@ -39,3 +39,4 @@ else {
 . $PSScriptRoot\Rest.ps1
 . $PSScriptRoot\MailReport.ps1
 . $PSScriptRoot\FileReport.ps1
+. $PSScriptRoot\KeyVault.ps1
