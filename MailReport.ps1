@@ -230,8 +230,14 @@ function ConvertFrom-RjRbMarkdownToHtml {
         return $placeholder
     }
 
-    # Horizontal rules - use color/size/noshade attributes for Outlook Classic
-    $html = $html -replace '(?m)^(-{3,}|\*{3,}|_{3,})$', '<!--[if mso]><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0;"><tr><td style="border-top:2px solid #e5e7eb;font-size:1px;line-height:1px;" height="1">&nbsp;</td></tr></table><![endif]--><!--[if !mso]><!--><hr style="border:none;border-top:2px solid #e5e7eb;margin:24px 0;height:0;" /><!--<![endif]-->'
+    # Horizontal rules - split per engine. Outlook Classic (Word) does not reliably
+    # render <hr> (border CSS suppresses it, the size/color attributes alone draw
+    # nothing here), so the mso branch uses a 1-cell table whose top border is the
+    # line. That cell would otherwise inherit the data-table rules .content table
+    # (border-radius/box-shadow/background -> rounded pill) and .content td
+    # (border-bottom -> a second line), so both are reset inline (inline beats the
+    # class selectors). Modern clients ignore the mso branch and use the plain <hr>.
+    $html = $html -replace '(?m)^(-{3,}|\*{3,}|_{3,})$', '<!--[if mso]><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:16px 0;border:0;border-collapse:collapse;background:transparent;mso-table-lspace:0pt;mso-table-rspace:0pt;"><tr><td style="border:0;border-top:2px solid #e5e7eb;font-size:0;line-height:0;mso-line-height-rule:exactly;background:transparent;">&nbsp;</td></tr></table><![endif]--><!--[if !mso]><!--><hr style="border:0;border-top:2px solid #e5e7eb;margin:16px 0;" /><!--<![endif]-->'
 
     # Headers (all 6 levels) - now safe from code block interference
     # Also supports headers without space after # (e.g., #Header instead of # Header)
