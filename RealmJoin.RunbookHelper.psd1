@@ -16,13 +16,13 @@
         'Use-RjRbInterface', 'Write-RjRbLog', 'Write-RjRbDebug',
         'Invoke-RjRbRestMethod', 'Invoke-RjRbRestMethodGraph', 'Invoke-RjRbRestMethodDefenderATP',
         'Connect-RjRbAzAccount', 'Connect-RjRbAzureAD', 'Get-RjRbAzureADTenantDetail', 'Connect-RjRbExchangeOnline',
-        'Connect-RjRbGraph', 'Connect-RjRbDefenderATP', 'Send-RjReportEmail',
-        'ConvertFrom-RjRbMarkdownToHtml', 'Get-RjReportEmailBody', 'Resolve-RjRbImageSource',
+        'Connect-RjRbGraph', 'Connect-RjRbDefenderATP', 'Send-RjRbReportEmail',
+        'ConvertFrom-RjRbMarkdownToHtml', 'Get-RjRbReportEmailBody', 'Resolve-RjRbImageSource',
         'Publish-RjRbFilesToStorageContainer',
         'Publish-RjRbKeyVaultSecret', 'Publish-RjRbKeyVaultKey', 'Publish-RjRbKeyVaultCertificate'
     )
     CmdletsToExport   = @()
-    AliasesToExport   = @('Use-RJInterface')
+    AliasesToExport   = @('Use-RJInterface', 'Send-RjReportEmail')
 
     FileList          = @(
         'RealmJoin.RunbookHelper.psm1',
@@ -55,7 +55,7 @@
             # - Az.KeyVault: required by Publish-RjRbKeyVaultSecret, Publish-RjRbKeyVaultKey,
             #   and Publish-RjRbKeyVaultCertificate.
             # - Az.Resources: required by the Key Vault publish helpers for Get/New-AzRoleAssignment.
-            # - Microsoft.Graph.Authentication: only required by Send-RjReportEmail when
+            # - Microsoft.Graph.Authentication: only required by Send-RjRbReportEmail when
             #   -UseNativeGraphRequest is set.
             ExternalModuleDependencies = @('Az.Accounts', 'Az.KeyVault', 'Az.Resources', 'Microsoft.Graph.Authentication')
         }

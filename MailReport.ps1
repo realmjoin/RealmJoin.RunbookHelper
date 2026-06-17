@@ -608,7 +608,7 @@ function ConvertFrom-RjRbMarkdownToHtml {
     return $html
 }
 
-function Get-RjReportEmailBody {
+function Get-RjRbReportEmailBody {
     <#
         .SYNOPSIS
         Builds the RealmJoin-branded HTML email body used for report delivery.
@@ -1353,13 +1353,13 @@ function Get-RjRbMimeTypeFromExtension {
     }
 }
 
-function Send-RjReportEmail {
+function Send-RjRbReportEmail {
     <#
         .SYNOPSIS
         Sends a RealmJoin-branded HTML email (converted from Markdown) via Microsoft Graph.
 
         .DESCRIPTION
-        Send-RjReportEmail builds an HTML email from Markdown content, inlines a RealmJoin-styled HTML template (including light/dark logos), attaches optional files, and sends the message using the Microsoft Graph API (Invoke-MgGraphRequest).
+        Send-RjRbReportEmail builds an HTML email from Markdown content, inlines a RealmJoin-styled HTML template (including light/dark logos), attaches optional files, and sends the message using the Microsoft Graph API (Invoke-MgGraphRequest).
 
         .PARAMETER EmailFrom
         The sender user id (user principal name or id) used for the Graph /users/{id}/sendMail call.
@@ -1648,7 +1648,7 @@ function Send-RjReportEmail {
         }
     }
 
-    $htmlBody = Get-RjReportEmailBody `
+    $htmlBody = Get-RjRbReportEmailBody `
         -Subject $Subject `
         -HtmlContent $htmlContent `
         -Attachments $validatedAttachments `
@@ -1659,7 +1659,7 @@ function Send-RjReportEmail {
         -FooterLink $FooterLink
 
     # --- Ensure a Graph connection is active --------------------------------
-    # Send-RjReportEmail is typically the first/only Graph touchpoint in a
+    # Send-RjRbReportEmail is typically the first/only Graph touchpoint in a
     # runbook, so we lazily establish a connection here if none is active.
     # The probe is intentionally permission-free: we only inspect local auth
     # state (script-scope auth headers / Get-MgContext), no network call.
@@ -1757,3 +1757,8 @@ function Send-RjReportEmail {
         }
     }
 }
+
+# Backwards-compatible alias: the original public name was Send-RjReportEmail.
+# The function was renamed to Send-RjRbReportEmail for naming consistency (RjRb
+# prefix); keep the old name working for existing runbooks.
+New-Alias -Name Send-RjReportEmail -Value Send-RjRbReportEmail
