@@ -2,7 +2,7 @@
 
 @{
     RootModule        = 'RealmJoin.RunbookHelper.psm1'
-    ModuleVersion     = '0.8.6'
+    ModuleVersion     = '0.8.7'
     GUID              = '50c59179-6cb8-4968-bf76-e7de04f02957'
     Author            = 'glueckkanja AG'
     CompanyName       = 'glueckkanja AG'
@@ -17,7 +17,8 @@
         'Invoke-RjRbRestMethod', 'Invoke-RjRbRestMethodGraph', 'Invoke-RjRbRestMethodDefenderATP',
         'Connect-RjRbAzAccount', 'Connect-RjRbAzureAD', 'Get-RjRbAzureADTenantDetail', 'Connect-RjRbExchangeOnline',
         'Connect-RjRbGraph', 'Connect-RjRbDefenderATP', 'Send-RjReportEmail',
-        'Publish-RjRbFilesToStorageContainer'
+        'Publish-RjRbFilesToStorageContainer',
+        'Publish-RjRbKeyVaultSecret', 'Publish-RjRbKeyVaultKey', 'Publish-RjRbKeyVaultCertificate'
     )
     CmdletsToExport   = @()
     AliasesToExport   = @('Use-RJInterface')
@@ -35,6 +36,7 @@
         'Logging.ps1',
         'MailReport.ps1',
         'FileReport.ps1',
+        'KeyVault.ps1',
         'Rest.ps1',
         'Assets\Header.png',
         'Assets\Footer.png'
@@ -47,9 +49,14 @@
 
             # Informational only - NOT enforced at Import-Module time.
             # Consuming runbooks must declare the modules they actually use via #Requires.
-            # - Az.Accounts: required by Publish-RjRbFilesToStorageContainer and Connect-RjRbAzAccount.
-            # - Microsoft.Graph.Authentication: only required by Send-RjReportEmail when -UseNativeGraphRequest is set.
-            ExternalModuleDependencies = @('Az.Accounts', 'Microsoft.Graph.Authentication')
+            # - Az.Accounts: required by Connect-RjRbAzAccount, Publish-RjRbFilesToStorageContainer,
+            #   and the Key Vault publish helpers.
+            # - Az.KeyVault: required by Publish-RjRbKeyVaultSecret, Publish-RjRbKeyVaultKey,
+            #   and Publish-RjRbKeyVaultCertificate.
+            # - Az.Resources: required by the Key Vault publish helpers for Get/New-AzRoleAssignment.
+            # - Microsoft.Graph.Authentication: only required by Send-RjReportEmail when
+            #   -UseNativeGraphRequest is set.
+            ExternalModuleDependencies = @('Az.Accounts', 'Az.KeyVault', 'Az.Resources', 'Microsoft.Graph.Authentication')
         }
     }
 }
