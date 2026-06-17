@@ -79,10 +79,10 @@ function Resolve-RjRbImageSource {
 
     $extension = [IO.Path]::GetExtension($Path).ToLowerInvariant()
     $contentType = switch ($extension) {
-        '.png'  { 'image/png' }
-        '.jpg'  { 'image/jpeg' }
+        '.png' { 'image/png' }
+        '.jpg' { 'image/jpeg' }
         '.jpeg' { 'image/jpeg' }
-        '.gif'  { 'image/gif' }
+        '.gif' { 'image/gif' }
         default { throw "Unsupported image type '$extension' for $Path. Use PNG, JPG or GIF." }
     }
 
@@ -100,7 +100,7 @@ function ConvertFrom-RjRbMarkdownToHtml {
 
         .DESCRIPTION
         Lightweight Markdown to HTML converter supporting headers, lists, tables, code blocks,
-        links, images, bold, italic, blockquotes, and horizontal rules.
+        links, link buttons, images, bold, italic, blockquotes, and horizontal rules.
 
         .PARAMETER MarkdownText
         The Markdown text to convert to HTML.
@@ -182,22 +182,79 @@ function ConvertFrom-RjRbMarkdownToHtml {
         return $placeholder
     }
 
+    # Extract and protect link buttons before the generic link processing below
+    # Syntax:  [Label](https://url){button}
+    # Example: [Approve](url1){button} [Reject](url2){button}
+    # Multiple buttons are rendered in the same row.
+    # Rounded button corners are only supported in modern clients (e.g. Outlook New, OWA, mobile Outlook app). 
+    # Outlook Classic (Word engine) renders square button corners.
+    $buttonRows = @()
+    $buttonRowIndex = 0
+    $html = $html -replace '(?m)^[ \t]*(?:\[[^\]]+\]\([^)]+\)\{\s*button\s*\}[ \t]*)+$', {
+        $line = $_.Value
+        $buttons = [regex]::Matches($line, '\[([^\]]+)\]\(([^)]+)\)\{\s*button\s*\}')
+
+        $count = $buttons.Count
+        $cellPercent = [int]([Math]::Floor(100 / $count))
+        $msoCells = [System.Collections.Generic.List[string]]::new()
+        $webButtons = [System.Collections.Generic.List[string]]::new()
+        $tableReset = 'border:none;border-collapse:collapse;box-shadow:none;border-radius:0;background:none;'
+        for ($i = 0; $i -lt $count; $i++) {
+            $button = $buttons[$i]
+            $label = $button.Groups[1].Value.Trim() -replace '&', '&amp;' -replace '<', '&lt;' -replace '>', '&gt;'
+            $href = $button.Groups[2].Value.Trim() -replace '&', '&amp;' -replace '"', '&quot;'
+
+            # Outlook Classic (Word engine) buttons are rendered as table cells with 100% width divided equally between them. 
+            # To prevent the buttons from sticking together, add left/right padding to all but the outer edges of the button group.
+            $msoPad = if ($count -le 1) { 'padding:0;' }
+            elseif ($i -eq 0) { 'padding:0 6px 0 0;' }
+            elseif ($i -eq ($count - 1)) { 'padding:0 0 0 6px;' }
+            else { 'padding:0 6px;' }
+            $msoCells.Add("<td width=`"$cellPercent%`" valign=`"top`" style=`"${msoPad}border:none;background:none;`"><table role=`"presentation`" width=`"100%`" cellpadding=`"0`" cellspacing=`"0`" border=`"0`" style=`"width:100%;$tableReset`"><tr><td bgcolor=`"#f8842c`" align=`"center`" valign=`"middle`" style=`"mso-padding-alt:14px 8px;padding:14px 8px;border:none;`"><a href=`"$href`" style=`"font-family:'Segoe UI',Arial,sans-serif;font-size:16px;font-weight:bold;line-height:16px;color:#ffffff;text-decoration:none;mso-line-height-rule:exactly;`">$label</a></td></tr></table></td>")
+
+            # Modern clients support flexible button widths and rounded corners. 
+            # Render buttons as links with padding and background color, wrapped in a flex container to allow wrapping if there are many buttons or the labels are long.
+            $webButtons.Add("<a href=`"$href`" target=`"_blank`" rel=`"noopener noreferrer`" style=`"flex:1 1 200px;box-sizing:border-box;margin:6px;background-color:#f8842c;border-radius:8px;color:#ffffff;font-family:'Miriam Libre','Segoe UI',Arial,sans-serif;font-size:16px;font-weight:700;line-height:1;text-align:center;text-decoration:none;padding:14px 8px;`">$label</a>")
+        }
+
+        # Outlook Classic (Word engine) requires tables for complex layouts, so render buttons in a table row with one cell per button.
+        # Use a nested table for the button styling to prevent Word from stripping styles on the outer cell.
+        $msoRow = "<!--[if mso]><table role=`"presentation`" width=`"100%`" cellpadding=`"0`" cellspacing=`"0`" border=`"0`" style=`"width:100%;$tableReset`"><tr>$([string]::Join('', $msoCells))</tr></table><![endif]-->"
+        # Modern email clients support more flexible layouts and better CSS support, so render buttons as styled links in a flex container that allows wrapping if needed.
+        $webRow = "<!--[if !mso]><!--><div style=`"display:flex;flex-wrap:wrap;margin:-6px;`">$([string]::Join('', $webButtons))</div><!--<![endif]-->"
+        $row = "<div style=`"margin:24px 0;line-height:1.6;`">$msoRow$webRow</div>"
+
+        $placeholder = "§BUTTONROW§$buttonRowIndex§"
+        $buttonRows += $row
+        $buttonRowIndex++
+        return $placeholder
+    }
+
     # Horizontal rules - use color/size/noshade attributes for Outlook Classic
     $html = $html -replace '(?m)^(-{3,}|\*{3,}|_{3,})$', '<!--[if mso]><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0;"><tr><td style="border-top:2px solid #e5e7eb;font-size:1px;line-height:1px;" height="1">&nbsp;</td></tr></table><![endif]--><!--[if !mso]><!--><hr style="border:none;border-top:2px solid #e5e7eb;margin:24px 0;height:0;" /><!--<![endif]-->'
 
     # Headers (all 6 levels) - now safe from code block interference
     # Also supports headers without space after # (e.g., #Header instead of # Header)
-    $html = $html -replace '(?m)^######\s*(.+)$', '<h6 style="color:#111827;margin-top:15px;margin-bottom:15px;font-size:16px;font-weight:800;">$1</h6>'
-    $html = $html -replace '(?m)^#####\s*(.+)$', '<h5 style="color:#111827;margin-top:15px;margin-bottom:15px;font-size:16px;font-weight:800;">$1</h5>'
-    $html = $html -replace '(?m)^####\s*(.+)$', '<h4 style="color:#111827;margin-top:15px;margin-bottom:15px;font-size:16px;font-weight:800;">$1</h4>'
-    $html = $html -replace '(?m)^###\s*(.+)$', '<h3 style="color:#111827;margin-top:27px;margin-bottom:15px;font-size:18px;font-weight:800;">$1</h3>'
-    $html = $html -replace '(?m)^##\s*(.+)$', '<h2 style="color:#111827;margin-top:42px;margin-bottom:15px;font-size:22px;font-weight:800;">$1</h2>'
-    $html = $html -replace '(?m)^#\s*(.+)$', '<h1 style="color:#111827;border-bottom:2px solid #111827;padding-bottom:12px;margin-bottom:15px;font-size:26px;font-weight:800;">$1</h1>'
+    # mso-margin-*-alt mirror the margins for Outlook Classic (the Word engine ignores
+    # standard margin on headings, which otherwise glues the next paragraph to the heading).
+    $html = $html -replace '(?m)^######\s*(.+)$', '<h6 style="color:#111827;margin-top:15px;margin-bottom:15px;mso-margin-top-alt:15px;mso-margin-bottom-alt:15px;font-size:16px;font-weight:800;">$1</h6>'
+    $html = $html -replace '(?m)^#####\s*(.+)$', '<h5 style="color:#111827;margin-top:15px;margin-bottom:15px;mso-margin-top-alt:15px;mso-margin-bottom-alt:15px;font-size:16px;font-weight:800;">$1</h5>'
+    $html = $html -replace '(?m)^####\s*(.+)$', '<h4 style="color:#111827;margin-top:15px;margin-bottom:15px;mso-margin-top-alt:15px;mso-margin-bottom-alt:15px;font-size:16px;font-weight:800;">$1</h4>'
+    $html = $html -replace '(?m)^###\s*(.+)$', '<h3 style="color:#111827;margin-top:27px;margin-bottom:15px;mso-margin-top-alt:27px;mso-margin-bottom-alt:15px;font-size:18px;font-weight:800;">$1</h3>'
+    $html = $html -replace '(?m)^##\s*(.+)$', '<h2 style="color:#111827;margin-top:42px;margin-bottom:15px;mso-margin-top-alt:42px;mso-margin-bottom-alt:15px;font-size:22px;font-weight:800;">$1</h2>'
+    # h1 carries a border-bottom; the Word engine drops its margin, gluing the next
+    # paragraph to the rule. Recreate the gap with an MSO-only line-height spacer div
+    # (the pattern used in the HTML templates) - a spacer *table* adds Word's own
+    # space-before/after and overshoots.
+    $html = $html -replace '(?m)^#\s*(.+)$', '<h1 style="color:#111827;border-bottom:2px solid #111827;padding-bottom:12px;margin-bottom:15px;mso-margin-top-alt:0;font-size:26px;font-weight:800;">$1</h1><!--[if mso]><div style="line-height:15px;font-size:0;mso-line-height-rule:exactly;">&nbsp;</div><![endif]-->'
 
     # Bold and Italic (limit to single line to prevent backtracking)
     $html = $html -replace '\*\*([^\n\r*]+)\*\*', '<strong>$1</strong>'
     $html = $html -replace '\*([^\n\r*]+)\*', '<em>$1</em>'
     $html = $html -replace '~~([^\n\r~]+)~~', '<span style="text-decoration:line-through;">$1</span>'
+
+    # Explicit line breaks may by forced with <br>, <br/> or <br />
+    $html = $html -replace '(?i)<br\s*/?>', '<br>'
 
     # Links and Images
     $html = $html -replace '!\[([^\]]*)\]\(([^)]+)\)', '<img src="$2" alt="$1"/>'
@@ -231,7 +288,8 @@ function ConvertFrom-RjRbMarkdownToHtml {
                 # Nested lists: no top/bottom margin to prevent extra spacing in Outlook New
                 $nestedStyle = if ($ListType -eq 'ul') {
                     'style="margin:0;padding-left:20px;list-style-type:disc;"'
-                } else {
+                }
+                else {
                     'style="margin:0;padding-left:20px;list-style-type:decimal;"'
                 }
                 $ProcessedLines.Value += "<$ListType $nestedStyle>"
@@ -307,11 +365,11 @@ function ConvertFrom-RjRbMarkdownToHtml {
 
                 if ($admonitionType) {
                     $palette = switch ($admonitionType) {
-                        'NOTE'      { @{ Accent = '#3b82f6'; Title = 'Note';      Glyph = '&#9432;' } }
-                        'TIP'       { @{ Accent = '#10b981'; Title = 'Tip';       Glyph = '&#128161;' } }
+                        'NOTE' { @{ Accent = '#3b82f6'; Title = 'Note'; Glyph = '&#9432;' } }
+                        'TIP' { @{ Accent = '#10b981'; Title = 'Tip'; Glyph = '&#128161;' } }
                         'IMPORTANT' { @{ Accent = '#8b5cf6'; Title = 'Important'; Glyph = '&#10071;' } }
-                        'WARNING'   { @{ Accent = '#f59e0b'; Title = 'Warning';   Glyph = '&#9888;' } }
-                        'CAUTION'   { @{ Accent = '#ef4444'; Title = 'Caution';   Glyph = '&#9940;' } }
+                        'WARNING' { @{ Accent = '#f59e0b'; Title = 'Warning'; Glyph = '&#9888;' } }
+                        'CAUTION' { @{ Accent = '#ef4444'; Title = 'Caution'; Glyph = '&#9940;' } }
                     }
                     # Same MSO/non-MSO wrapper pattern as a plain blockquote, but
                     # no italics and a per-type accent colour on the left border.
@@ -340,7 +398,11 @@ function ConvertFrom-RjRbMarkdownToHtml {
             Close-AllList -ListStack ([ref]$listStack) -ProcessedLines ([ref]$processedLines) -InUnorderedList ([ref]$inUnorderedList) -InOrderedList ([ref]$inOrderedList)
 
             if (-not $inTable) {
-                $processedLines += '<div class="table-wrapper" style="margin:15px 0;">'
+                # mso-margin-bottom-alt:0 stops the Word engine from stacking this wrapper's
+                # bottom margin on top of the next heading's (large) top margin - Word does
+                # not collapse adjacent margins the way browsers/OWA do, so without it the
+                # gap after a table looks bigger than the gap after a paragraph.
+                $processedLines += '<div class="table-wrapper" style="margin:15px 0;mso-margin-bottom-alt:0;">'
                 $processedLines += '<table class="table table-striped" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:collapse;background-color:white;border:1px solid #e8ebed;">'
                 $inTable = $true
                 $tableRowIndex = 0
@@ -569,12 +631,20 @@ function ConvertFrom-RjRbMarkdownToHtml {
         # Check if block starts with an HTML element tag (opening or closing)
         if ($block -match "^<(h[1-6]|ul|ol|table|pre|blockquote|hr)[\s>]" -or
             $block -match "^</(h[1-6]|ul|ol|table|pre|blockquote)>" -or
-            $block -match '§CODEBLOCK§') {
+            $block -match '§CODEBLOCK§' -or
+            $block -match '§BUTTONROW§') {
             $result += $block
         }
         # Check if it contains HTML list elements - if so, don't wrap
         elseif ($block -match "<(h[1-6]|ul|ol|li|table|thead|tbody|tr|td|th|pre|code|blockquote|hr|/ul|/ol)[\s>]") {
             $result += $block
+        }
+        # Check if block is only <br> tags to force line breaks
+        elseif ($block -match '^(?:<br>\s*)+$') {
+            $breakCount = ([regex]::Matches($block, '<br>')).Count
+            for ($b = 0; $b -lt $breakCount; $b++) {
+                $result += '<div style="line-height:16px;font-size:0;mso-line-height-rule:exactly;">&nbsp;</div>'
+            }
         }
         else {
             $lines = $block -split "`n"
@@ -605,6 +675,11 @@ function ConvertFrom-RjRbMarkdownToHtml {
         $html = $html -replace "§CODEBLOCK§$i§", $codeBlocks[$i]
     }
 
+    # Restore link button rows from placeholders
+    for ($i = 0; $i -lt $buttonRows.Count; $i++) {
+        $html = $html -replace "§BUTTONROW§$i§", $buttonRows[$i]
+    }
+
     return $html
 }
 
@@ -623,6 +698,9 @@ function Get-RjRbReportEmailBody {
         .PARAMETER HtmlContent
         HTML fragment generated from Markdown that will be embedded in the email body.
 
+        .PARAMETER MarkdownText
+        Markdown text that will be converted to HTML and embedded in the email body.
+
         .PARAMETER Attachments
         Optional list of attachment file paths to surface in the "Attached Files" section.
 
@@ -632,6 +710,27 @@ function Get-RjRbReportEmailBody {
         .PARAMETER ReportVersion
         Optional report version string rendered in the tenant information box.
 
+        .PARAMETER IncludeTenantInfo
+        If set, includes the tenant information box in the email body, showing the TenantDisplayName and ReportVersion values.
+
+        .PARAMETER IncludeHeader
+        If set, includes the RealmJoin-branded header in the email body.
+
+        .PARAMETER HeaderAltText
+        Optional alt text for the header image. Defaults to 'RealmJoin - Insights on Demand'.
+
+        .PARAMETER IncludeFooter
+        If set, includes the RealmJoin-branded footer in the email body.
+
+        .PARAMETER FooterLink
+        Optional URL that overrides the hyperlink wrapping the footer image. Defaults to
+        'https://www.realmjoin.com'. The supplied value is used verbatim as the href and
+        title attributes of the footer anchor element.
+
+        .PARAMETER FooterAltText
+        Optional alt text for the footer image. Defaults to
+        'RealmJoin - Companion to Intune - Application Lifecycle and Management Automation Platform'. The supplied value is used verbatim as the alt attribute of the footer image.
+
         .OUTPUTS
         System.String. Returns the composed HTML email body.
     #>
@@ -639,8 +738,9 @@ function Get-RjRbReportEmailBody {
         [Parameter(Mandatory = $true)]
         [string]$Subject,
 
-        [Parameter(Mandatory = $true)]
         [string]$HtmlContent,
+
+        [string]$MarkdownText,
 
         [string[]]$Attachments = @(),
 
@@ -648,12 +748,22 @@ function Get-RjRbReportEmailBody {
 
         [string]$ReportVersion,
 
+        [switch]$IncludeTenantInfo,
+
         [switch]$IncludeHeader,
+
+        [string]$HeaderAltText = 'RealmJoin - Insights on Demand',
 
         [switch]$IncludeFooter,
 
-        [string]$FooterLink = 'https://www.realmjoin.com'
+        [string]$FooterLink = 'https://www.realmjoin.com',
+
+        [string]$FooterAltText = 'RealmJoin - Companion to Intune - Application Lifecycle and Management Automation Platform - Visit https://www.realmjoin.com'
     )
+
+    if ([string]::IsNullOrEmpty($HtmlContent) -and -not [string]::IsNullOrEmpty($MarkdownText)) {
+        $HtmlContent = ConvertFrom-RjRbMarkdownToHtml -MarkdownText $MarkdownText
+    }
 
     if (-not $Attachments) {
         $Attachments = @()
@@ -1209,11 +1319,11 @@ function Get-RjRbReportEmailBody {
     <![endif]-->
     <div class="email-container">
         $(if ($IncludeHeader) {
-            @'
-        <div class="header">
-            <img class="header-img" src="cid:header" alt="RealmJoin – Insights on Demand" width="750" height="200" />
+            @"
+        <div class='header'>
+            <img class='header-img' src='cid:header' alt='$HeaderAltText' width='750' />
         </div>
-'@
+"@
         })
 
         <div class="content">
@@ -1225,6 +1335,8 @@ function Get-RjRbReportEmailBody {
 
             $($HtmlContent)
 
+            $(if ($IncludeTenantInfo) {
+                @'
             <!--[if mso]>
             <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top:32px;border-collapse:collapse;"><tr>
             <td bgcolor="#e8ebed" style="background-color:#e8ebed;border-left:4px solid #f8842c;padding:6px 20px;font-size:14px;" valign="top">
@@ -1233,9 +1345,23 @@ function Get-RjRbReportEmailBody {
             <div class="tenant-info" style="background:#e8ebed;border:1px solid #e0e7ff;border-left:4px solid #f8842c;padding:10px 20px;border-radius:8px;font-size:14px;margin-top:32px;">
             <!--<![endif]-->
                 <p style="margin:0;padding:0;mso-line-height-rule:exactly;">
-                    <strong>Tenant:</strong> $($TenantDisplayName)<br>
-                    <strong>Generated:</strong> $([System.Threading.Thread]::CurrentThread.CurrentCulture = 'en-US'; Get-Date -Format "dddd, MMMM d, yyyy HH:mm") <br>
-                    <strong>Report Version:</strong> $($ReportVersion)
+'@
+            })
+
+            $(if ($IncludeTenantInfo -and -not [string]::IsNullOrEmpty($TenantDisplayName)) {
+                    "<strong>Tenant:</strong> $($TenantDisplayName)"
+            })
+
+            $(if ($IncludeTenantInfo -and -not [string]::IsNullOrEmpty($TenantDisplayName) -and -not [string]::IsNullOrEmpty($ReportVersion)) {
+                "<br>"
+            })
+            
+            $(if ($IncludeTenantInfo -and -not [string]::IsNullOrEmpty($ReportVersion)) {
+                "<strong>Report Version:</strong> $($ReportVersion)<br><strong>Generated:</strong> $([System.Threading.Thread]::CurrentThread.CurrentCulture = 'en-US'; Get-Date -Format "dddd, MMMM d, yyyy HH:mm")"
+            })
+            
+            $(if ($IncludeTenantInfo) {
+                @'
                 </p>
             <!--[if !mso]><!-->
             </div>
@@ -1243,6 +1369,8 @@ function Get-RjRbReportEmailBody {
             <!--[if mso]>
             </td></tr></table>
             <![endif]-->
+'@
+            })
 
             $(if (@($Attachments).Count -gt 0) {
             @"
@@ -1276,14 +1404,10 @@ function Get-RjRbReportEmailBody {
         </div>
 
         $(if ($IncludeFooter) {
-            @"
-        <!--[if mso]>
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%"><tr><td style="font-size:1px;line-height:24px;height:24px;">&nbsp;</td></tr></table>
-        <![endif]-->
-        <!--[if !mso]><!--><div style="height:24px;line-height:24px;font-size:1px;">&nbsp;</div><!--<![endif]-->
+            @"        
         <div class="footer">
             <a href="$FooterLink" target="_blank" title="Visit $FooterLink" style="display:block;border:0;outline:none;text-decoration:none;">
-                <img class="footer-img" src="cid:footer" alt="RealmJoin - Companion to Intune - Application Lifecycle and Management Automation Platform - Visit $FooterLink" width="750" height="200" border="0" style="display:block;width:100%;max-width:750px;height:auto;border:0;outline:none;text-decoration:none;" />
+                <img class="footer-img" src="cid:footer" alt="$FooterAltText" width="750" border="0" style="display:block;width:100%;max-width:750px;height:auto;border:0;outline:none;text-decoration:none;" />
             </a>
         </div>
 "@
@@ -1395,7 +1519,7 @@ function Send-RjRbReportEmail {
         a warning is written and the bundled default header is used instead - the send
         is not aborted.
 
-        Recommended dimensions: 750x200 px PNG (matches the email-container width and
+        Recommended dimensions: 750 px width PNG (matches the email-container width and
         the bundled default). Larger images scale down responsively; significantly
         different aspect ratios may look distorted on narrow viewports.
 
@@ -1408,7 +1532,7 @@ function Send-RjRbReportEmail {
         you want in the footer must already be baked into the supplied PNG (see
         Tests/Build-FooterAsset.ps1 for how the bundled default is composed).
 
-        Recommended dimensions: 750x200 px PNG (same as -HeaderImage).
+        Recommended dimensions: 750 px width PNG (same as -HeaderImage).
 
         .PARAMETER FooterLink
         Optional URL that overrides the hyperlink wrapping the footer image. Defaults to
@@ -1654,6 +1778,7 @@ function Send-RjRbReportEmail {
         -Attachments $validatedAttachments `
         -TenantDisplayName $TenantDisplayName `
         -ReportVersion $ReportVersion `
+        -IncludeTenantInfo `
         -IncludeHeader:$includeHeader `
         -IncludeFooter:$includeFooter `
         -FooterLink $FooterLink
