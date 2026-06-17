@@ -17,6 +17,7 @@
         'Invoke-RjRbRestMethod', 'Invoke-RjRbRestMethodGraph', 'Invoke-RjRbRestMethodDefenderATP',
         'Connect-RjRbAzAccount', 'Connect-RjRbAzureAD', 'Get-RjRbAzureADTenantDetail', 'Connect-RjRbExchangeOnline',
         'Connect-RjRbGraph', 'Connect-RjRbDefenderATP', 'Send-RjReportEmail',
+        'ConvertFrom-RjRbMarkdownToHtml', 'Get-RjReportEmailBody', 'Resolve-RjRbImageSource',
         'Publish-RjRbFilesToStorageContainer',
         'Publish-RjRbKeyVaultSecret', 'Publish-RjRbKeyVaultKey', 'Publish-RjRbKeyVaultCertificate'
     )
