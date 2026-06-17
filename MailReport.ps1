@@ -93,7 +93,7 @@ function Resolve-RjRbImageSource {
     }
 }
 
-function ConvertFrom-MarkdownToHtml {
+function ConvertFrom-RjRbMarkdownToHtml {
     <#
         .SYNOPSIS
         Converts Markdown text to HTML with support for common Markdown syntax.
@@ -106,7 +106,7 @@ function ConvertFrom-MarkdownToHtml {
         The Markdown text to convert to HTML.
 
         .EXAMPLE
-        PS C:\> ConvertFrom-MarkdownToHtml -MarkdownText "# Hello World`n`nThis is **bold** text."
+        PS C:\> ConvertFrom-RjRbMarkdownToHtml -MarkdownText "# Hello World`n`nThis is **bold** text."
 
         .OUTPUTS
         System.String. Returns HTML string.
@@ -1116,6 +1116,26 @@ function Get-RjReportEmailBody {
     /* MSO Table Fixes */
     table { mso-table-lspace: 0pt; mso-table-rspace: 0pt; border-collapse: collapse; }
 
+    /* MSO Table Layout Fix - the Word engine uses automatic table layout
+       and grows a table to fit its widest cell, ignoring width="100%".
+       A wide data table therefore stretches the .content cell, which
+       stretches the fixed 750px .email-container past the fixed-width
+       header <img>, leaving an empty strip beside the header graphic.
+       Forcing fixed layout makes the Word engine honor the table's width
+       against its container and wrap long cell values instead of growing.
+       Scoped to .content so the outer 750px container table is untouched;
+       modern clients keep their .table-wrapper overflow-x scroll behaviour
+       because this lives in the MSO-only conditional block. */
+    .content table {
+        table-layout: fixed !important;
+        width: 100% !important;
+    }
+    .content th, .content td {
+        word-break: break-word;
+        overflow-wrap: break-word;
+        word-wrap: break-word;
+    }
+
     /* MSO Line Height Fix */
     .content p, .content li, .content td, .content th {
         mso-line-height-rule: exactly;
@@ -1279,7 +1299,7 @@ function Get-RjReportEmailBody {
 "@
 }
 
-function Get-MimeTypeFromExtension {
+function Get-RjRbMimeTypeFromExtension {
     <#
         .SYNOPSIS
         Returns the MIME type for a given file extension.
@@ -1292,11 +1312,11 @@ function Get-MimeTypeFromExtension {
         The file path to determine the MIME type for.
 
         .EXAMPLE
-        PS C:\> Get-MimeTypeFromExtension -FilePath "C:\temp\report.csv"
+        PS C:\> Get-RjRbMimeTypeFromExtension -FilePath "C:\temp\report.csv"
         Returns: text/csv
 
         .EXAMPLE
-        PS C:\> Get-MimeTypeFromExtension -FilePath "C:\temp\data.xlsx"
+        PS C:\> Get-RjRbMimeTypeFromExtension -FilePath "C:\temp\data.xlsx"
         Returns: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
 
         .OUTPUTS
@@ -1428,7 +1448,7 @@ function Send-RjReportEmail {
           module to be available in the runbook environment (cmdlets Get-MgContext,
           Connect-MgGraph, Invoke-MgGraphRequest). Declare it explicitly in the consuming
           runbook, e.g.:
-            #Requires -Modules @{ModuleName = "Microsoft.Graph.Authentication"; ModuleVersion = "2.0.0"}
+            #Requires -Modules @{ModuleName = "Microsoft.Graph.Authentication"; ModuleVersion = "2.37.0"}
 
     #>
     param(
@@ -1482,7 +1502,7 @@ function Send-RjReportEmail {
     Write-RjRbLog -Message "Parsed $($emailRecipients.Count) recipient(s) from EmailTo parameter" -Verbose
 
     # Convert Markdown to HTML using helper function
-    $htmlContent = ConvertFrom-MarkdownToHtml -MarkdownText $MarkdownContent
+    $htmlContent = ConvertFrom-RjRbMarkdownToHtml -MarkdownText $MarkdownContent
 
     Write-RjRbLog -Message "Successfully converted Markdown content to HTML" -Verbose
 
@@ -1494,7 +1514,7 @@ function Send-RjReportEmail {
             try {
                 $contentBytes = [IO.File]::ReadAllBytes($file)
                 $content = [Convert]::ToBase64String($contentBytes)
-                $mimeType = Get-MimeTypeFromExtension -FilePath $file
+                $mimeType = Get-RjRbMimeTypeFromExtension -FilePath $file
                 $emailAttachments += @{
                     "@odata.type"  = "#microsoft.graph.fileAttachment"
                     "name"         = (Split-Path $file -Leaf)
