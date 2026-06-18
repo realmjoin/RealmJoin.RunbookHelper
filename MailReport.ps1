@@ -222,7 +222,7 @@ function ConvertFrom-RjRbMarkdownToHtml {
         $msoRow = "<!--[if mso]><table role=`"presentation`" width=`"100%`" cellpadding=`"0`" cellspacing=`"0`" border=`"0`" style=`"width:100%;$tableReset`"><tr>$([string]::Join('', $msoCells))</tr></table><![endif]-->"
         # Modern email clients support more flexible layouts and better CSS support, so render buttons as styled links in a flex container that allows wrapping if needed.
         $webRow = "<!--[if !mso]><!--><div style=`"display:flex;flex-wrap:wrap;margin:-6px;`">$([string]::Join('', $webButtons))</div><!--<![endif]-->"
-        $row = "<div style=`"margin:24px 0;line-height:1.6;`">$msoRow$webRow</div>"
+        $row = "$msoRow$webRow"
 
         $placeholder = "§BUTTONROW§$buttonRowIndex§"
         $buttonRows += $row
