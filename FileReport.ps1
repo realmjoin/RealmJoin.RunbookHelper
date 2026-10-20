@@ -61,7 +61,8 @@ function New-RjRbBlobSasToken {
     }
 
     $sasToken = "sp=$permissions&st=$startTime&se=$expiryStr&spr=$signedProtocol&sv=$signedVersion&sr=$signedResource&sig=$([Uri]::EscapeDataString($sig))"
-    return "https://$StorageAccountName.blob.core.windows.net/$Container/${Blob}?$sasToken"
+    # The signature uses the unencoded blob name; the URL needs it encoded to stay one clickable link
+    return "https://$StorageAccountName.blob.core.windows.net/$Container/$([Uri]::EscapeDataString($Blob))?$sasToken"
 }
 
 function Publish-RjRbFilesToStorageContainer {
@@ -202,7 +203,10 @@ function Publish-RjRbFilesToStorageContainer {
             "x-ms-version"   = "2023-11-03"
             "x-ms-blob-type" = "BlockBlob"
         }
-        $canonResource = "/$StorageAccountName/$ContainerName/$blobName"
+        # Sign the path exactly as it is sent: spaces, umlauts and other special characters in
+        # the blob name are percent-encoded on the wire, and Azure signs the encoded path.
+        $blobUri = [Uri]"$baseUri/$ContainerName/$([Uri]::EscapeDataString($blobName))"
+        $canonResource = "/$StorageAccountName$($blobUri.AbsolutePath)"
         $blobHeaders["Authorization"] = Get-RjRbStorageSharedKeyAuthHeader -StorageAccountName $StorageAccountName -KeyBytes $keyBytes -Method "PUT" -CanonicalizedResource $canonResource -Headers $blobHeaders -ContentType "application/octet-stream" -ContentLength $contentLength
 
         # Use HttpClient directly to ensure all custom headers (x-ms-blob-type) are sent.
@@ -211,7 +215,7 @@ function Publish-RjRbFilesToStorageContainer {
         try {
             $content = [System.Net.Http.ByteArrayContent]::new($fileBytes)
             $content.Headers.ContentType = [System.Net.Http.Headers.MediaTypeHeaderValue]::new("application/octet-stream")
-            $request = [System.Net.Http.HttpRequestMessage]::new([System.Net.Http.HttpMethod]::Put, "$baseUri/$ContainerName/$blobName")
+            $request = [System.Net.Http.HttpRequestMessage]::new([System.Net.Http.HttpMethod]::Put, $blobUri)
             $request.Content = $content
             foreach ($h in $blobHeaders.GetEnumerator()) {
                 $request.Headers.TryAddWithoutValidation($h.Key, $h.Value) | Out-Null
