@@ -82,7 +82,8 @@ function Publish-RjRbFilesToStorageContainer {
         Required Azure RBAC on the storage account:
         - Microsoft.Storage/storageAccounts/read
         - Microsoft.Storage/storageAccounts/listKeys/action
-        Built-in role: 'Storage Account Contributor'.
+        Built-in role: 'Reader and Data Access' (least privilege; 'Storage Account Contributor'
+        also works). Shared key access must be allowed on the storage account.
 
         .PARAMETER FilePaths
         Array of local file paths to upload.
